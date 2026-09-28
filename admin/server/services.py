@@ -64,6 +64,9 @@ class UserMgr:
             result.append(
                 {
                     "avatar": user.avatar,
+                    "id": user.id,
+                    "owned_tenant_ids": [t["tenant_id"] for t in
+                        UserTenantService.get_tenants_by_user_id(user.id) if t.get("role") == "owner"],
                     "email": user.email,
                     "language": user.language,
                     "last_login_time": user.last_login_time,

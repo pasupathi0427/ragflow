@@ -23,7 +23,7 @@ from datetime import datetime
 from flask import Blueprint, Response, request
 from flask_login import current_user, login_required, logout_user
 
-from auth import login_admin, check_admin_auth
+from auth import login_verify, login_admin, check_admin_auth
 from responses import success_response, error_response
 from services import UserMgr, ServiceMgr, UserServiceMgr, SettingsMgr, ConfigMgr, EnvironmentsMgr, SandboxMgr
 from roles import RoleMgr
@@ -60,6 +60,15 @@ def logout():
         current_user.save()
         logout_user()
         return success_response(True)
+    except Exception as e:
+        return error_response(str(e), 500)
+
+
+@admin_bp.route("/auth", methods=["GET"])
+@login_verify
+def auth_admin():
+    try:
+        return success_response(None, "Admin is authorized", 0)
     except Exception as e:
         return error_response(str(e), 500)
 
@@ -490,7 +499,13 @@ def generate_user_api_key(username: str) -> tuple[Response, int]:
         tenants: list[dict[str, Any]] = UserServiceMgr.get_user_tenants(username)
         if not tenants:
             return error_response("Tenant not found!", 404)
-        tenant_id: str = tenants[0]["tenant_id"]
+        owned = {t["tenant_id"] for t in tenants if t.get("role") == "owner"}
+        requested = (request.get_json(silent=True) or {}).get("tenant_id")
+        if requested is None and len(owned) == 1:
+            requested = next(iter(owned))
+        if requested not in owned:
+            return error_response("An explicitly owned tenant is required", 403)
+        tenant_id: str = requested
         key: str = generate_confirmation_token()
         obj: dict[str, Any] = {
             "tenant_id": tenant_id,
