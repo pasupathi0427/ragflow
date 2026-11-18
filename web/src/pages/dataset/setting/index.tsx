@@ -32,6 +32,8 @@ import { isEqual } from 'lodash';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FieldErrors, useForm, useFormState, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { AccessFeature } from '@/constants/access-profile';
+import { useIsAccessFeatureEnabled } from '@/hooks/use-access-profile-request';
 import ChunkMethodLearnMore from './chunk-method-learn-more';
 import LinkDataSource, {
   IDataSourceNodeProps,
@@ -51,6 +53,9 @@ import { ApplyParserConfigDialog } from './apply-parser-config-dialog';
 
 export default function DatasetSetting() {
   const { t } = useTranslation();
+  const dataSourcesEnabled = useIsAccessFeatureEnabled(
+    AccessFeature.DataSources,
+  );
 
   // The missing verdict lives behind a ref because the schema must exist
   // before useForm runs, while the verdict derives from the form's watched
@@ -337,13 +342,17 @@ export default function DatasetSetting() {
                   </div>
                   <GeneralForm></GeneralForm>
 
-                  <Divider />
-                  <LinkDataSource
-                    data={pipelineDataList}
-                    handleLinkOrEditSubmit={handleLinkOrEditSubmit}
-                    unbindFunc={unbindFunc}
-                    handleAutoParse={handleAutoParse}
-                  />
+                  {dataSourcesEnabled && (
+                    <>
+                      <Divider />
+                      <LinkDataSource
+                        data={pipelineDataList}
+                        handleLinkOrEditSubmit={handleLinkOrEditSubmit}
+                        unbindFunc={unbindFunc}
+                        handleAutoParse={handleAutoParse}
+                      />
+                    </>
+                  )}
 
                   <Divider />
                   <div className="text-base font-medium text-text-primary">

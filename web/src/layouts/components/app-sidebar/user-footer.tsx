@@ -20,6 +20,8 @@ import {
   EnterpriseSidebarTenantSwitcher,
 } from '@/ee/layouts/components/header-enterprise';
 import { useChangeLanguage } from '@/hooks/logic-hooks';
+import { AccessFeature } from '@/constants/access-profile';
+import { useIsAccessFeatureEnabled } from '@/hooks/use-access-profile-request';
 import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
 import { useLogout } from '@/hooks/use-login-request';
 import {
@@ -53,6 +55,7 @@ export function UserFooter() {
   const { t } = useTranslation();
   const { navigateToUserSettingProfile, navigateToUserSettingApi } =
     useNavigatePage();
+  const apiEnabled = useIsAccessFeatureEnabled(AccessFeature.Api);
   const changeLanguage = useChangeLanguage();
   const { logout } = useLogout();
   const { theme, setTheme } = useTheme();
@@ -168,10 +171,12 @@ export function UserFooter() {
               <LucideUser />
               {t('setting.profile')}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={navigateToUserSettingApi}>
-              <LucideUnplug />
-              {t('setting.api')}
-            </DropdownMenuItem>
+            {apiEnabled && (
+              <DropdownMenuItem onClick={navigateToUserSettingApi}>
+                <LucideUnplug />
+                {t('setting.api')}
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuSeparator />
 

@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+import { AccessFeatureRouteGuard } from '@/components/access-feature-route-guard';
 import { Button } from '@/components/ui/button';
 import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
 import { cn } from '@/lib/utils';
@@ -46,7 +47,9 @@ function UserSetting() {
           'pr-16 md:pr-20 pb-6 flex flex-1 min-w-0 rounded-lg overflow-hidden',
         )}
       >
-        <Outlet />
+        <AccessFeatureRouteGuard>
+          <Outlet />
+        </AccessFeatureRouteGuard>
       </div>
     </section>
   );

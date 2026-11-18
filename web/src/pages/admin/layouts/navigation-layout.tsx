@@ -7,6 +7,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   LucideMonitor,
   LucideServerCrash,
+  LucideShieldCheck,
   LucideSquareUserRound,
   LucideUserCog,
   LucideUserStar,
@@ -53,6 +54,11 @@ const AdminNavigationLayout = () => {
         path: Routes.AdminSandboxSettings,
         name: t('admin.sandboxSettings'),
         icon: <LucideZap className="size-[1em]" />,
+      },
+      {
+        path: Routes.AdminAccessProfiles,
+        name: t('accessProfile.title'),
+        icon: <LucideShieldCheck className="size-[1em]" />,
       },
       ...(IS_ENTERPRISE
         ? [

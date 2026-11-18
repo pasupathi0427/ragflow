@@ -2,6 +2,7 @@ import { SidebarHeader } from '@/components/sidebar-header';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { EnterpriseHeaderUpgradeBadge } from '@/ee/layouts/components/header-enterprise';
+import { useAccessFeatureFilter } from '@/hooks/use-access-profile-request';
 import { useAgentSidebarCollapse } from '@/hooks/use-agent-sidebar-collapse';
 import { useChatSidebarCollapse } from '@/hooks/use-chat-sidebar-collapse';
 import { useCompilationTemplateSidebarCollapse } from '@/hooks/use-compilation-template-sidebar-collapse';
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router';
 import { IntegrationsNavGroup, NavItemLink } from './nav-item';
 import { matchesPath, NavItems } from './navigation';
+import { getNavItemAccessFeature } from './access-features';
 import { useSidebarCollapse } from './use-sidebar-collapse';
 import { UserFooter } from './user-footer';
 
@@ -36,6 +38,7 @@ function AppSidebarContent() {
     toggleCollapsed: toggleCompilationTemplateSidebar,
   } = useCompilationTemplateSidebarCollapse();
   const { pathname } = useLocation();
+  const navItems = useAccessFeatureFilter(NavItems, getNavItemAccessFeature);
 
   const activeSecondarySidebar = [
     {
@@ -120,7 +123,7 @@ function AppSidebarContent() {
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3 md:px-3">
         <ul className="flex flex-col gap-1">
-          {NavItems.map((item) => (
+          {navItems.map((item) => (
             <li key={item.key}>
               <NavItemLink item={item} />
             </li>

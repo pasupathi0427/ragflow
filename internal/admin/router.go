@@ -17,6 +17,8 @@
 package admin
 
 import (
+	"ragflow/internal/accessprofile"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -121,6 +123,8 @@ func (r *Router) Setup(engine *gin.Engine) {
 
 			protected.GET("/all-models", r.handler.ListAllModels)
 			protected.GET("/all-models/:model_name", r.handler.ShowModel)
+
+			accessprofile.RegisterAdminRoutes(protected)
 
 			RegisterEERouter(protected, r)
 		}

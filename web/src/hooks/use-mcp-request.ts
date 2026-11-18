@@ -15,7 +15,9 @@
  */
 
 import message from '@/components/ui/message';
+import { AccessFeature } from '@/constants/access-profile';
 import { ListDeletionKey } from '@/constants/list-deletion';
+import { useCanRequestAccessFeature } from '@/hooks/use-access-profile-request';
 import { ResponseType } from '@/interfaces/database/base';
 import {
   IExportedMcpServers,
@@ -75,6 +77,7 @@ export const useListMcpServer = (
     useHandleSearchChange();
   const { pagination, setPagination } = useGetPaginationWithRouter();
   const debouncedSearchString = useDebounce(searchString, { wait: 500 });
+  const mcpAllowed = useCanRequestAccessFeature(AccessFeature.Mcp);
 
   const { data, isFetching: loading } = useQuery<IMcpServerListResponse>({
     queryKey: McpKeys.scoped(
@@ -85,7 +88,7 @@ export const useListMcpServer = (
     ),
     initialData: { total: 0, mcp_servers: [] },
     gcTime: 0,
-    enabled,
+    enabled: enabled && mcpAllowed,
     queryFn: async () => {
       const { data } = await listMcpServers({
         keywords: debouncedSearchString,
@@ -110,11 +113,12 @@ export const useListMcpServer = (
 };
 
 export const useGetMcpServer = (id: string) => {
+  const mcpAllowed = useCanRequestAccessFeature(AccessFeature.Mcp);
   const { data, isFetching: loading } = useQuery<IMcpServer>({
     queryKey: [McpApiAction.GetMcpServer, id],
     initialData: {} as IMcpServer,
     gcTime: 0,
-    enabled: !!id,
+    enabled: !!id && mcpAllowed,
     queryFn: async () => {
       const { data } = await mcpServerService.get({ mcp_id: id });
       return data?.data ?? {};

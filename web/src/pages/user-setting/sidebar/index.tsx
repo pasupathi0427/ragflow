@@ -15,11 +15,14 @@
  */
 
 import { Button } from '@/components/ui/button';
+import { AccessFeature } from '@/constants/access-profile';
 import { useSettingMenuItems } from '@/ee/pages/user-setting/sidebar/use-setting-menu';
+import { useAccessFeatureFilter } from '@/hooks/use-access-profile-request';
 import { cn } from '@/lib/utils';
 import { Routes } from '@/routes';
 import { TFunction } from 'i18next';
 import { LucideUnplug, LucideUser } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHandleMenuClick } from './hooks';
 
@@ -36,10 +39,17 @@ const menuItems = (t: TFunction) => [
   },
 ];
 
+const getSettingMenuAccessFeature = (item: { key: string }) =>
+  item.key === Routes.Api ? AccessFeature.Api : undefined;
+
 export function SideBar() {
   const { handleMenuClick, active: activeItemKey } = useHandleMenuClick();
   const { t } = useTranslation();
-  const items = useSettingMenuItems(menuItems(t));
+  const baseItems = useMemo(() => menuItems(t), [t]);
+  const items = useAccessFeatureFilter(
+    useSettingMenuItems(baseItems),
+    getSettingMenuAccessFeature,
+  );
 
   return (
     <aside className="shrink-0 w-16 md:w-[303px] bg-bg-base flex flex-col overflow-hidden">

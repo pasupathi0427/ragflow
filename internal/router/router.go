@@ -17,6 +17,7 @@
 package router
 
 import (
+	"ragflow/internal/accessprofile"
 	"ragflow/internal/common"
 	"ragflow/internal/handler"
 
@@ -252,7 +253,9 @@ func (r *Router) Setup(engine *gin.Engine) {
 				// User tenant info endpoint
 				users.GET("/me/models", r.tenantHandler.TenantInfo)
 				// User set tenant info endpoint
-				users.PATCH("/me/models", r.userHandler.SetTenantInfo)
+				users.PATCH("/me/models", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.userHandler.SetTenantInfo)
+				// Feature switches from the user's access profile
+				users.GET("/me/features", accessprofile.MyFeatures)
 
 				// For EE
 				users.GET("/me/admin", r.userHandler.IsAdmin)
@@ -268,9 +271,9 @@ func (r *Router) Setup(engine *gin.Engine) {
 			{
 				tenants.GET("", r.tenantHandler.TenantList)
 				tenants.PATCH("/:tenant_id", r.tenantHandler.AcceptTenantInvite)
-				tenants.GET("/:tenant_id/users", r.tenantHandler.ListTenantMembers)
-				tenants.POST("/:tenant_id/users", r.tenantHandler.AddTenantMember)
-				tenants.DELETE("/:tenant_id/users", r.tenantHandler.RemoveTenantMember)
+				tenants.GET("/:tenant_id/users", accessprofile.RequireFeature(accessprofile.FeatureTeam), r.tenantHandler.ListTenantMembers)
+				tenants.POST("/:tenant_id/users", accessprofile.RequireFeature(accessprofile.FeatureTeam), r.tenantHandler.AddTenantMember)
+				tenants.DELETE("/:tenant_id/users", accessprofile.RequireFeature(accessprofile.FeatureTeam), r.tenantHandler.RemoveTenantMember)
 			}
 
 			// Tenant routes (per-tenant resources)
@@ -521,7 +524,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 			}
 
 			// provider pool route group
-			provider := v1.Group("/providers", ToggleModel())
+			provider := v1.Group("/providers", ToggleModel(), accessprofile.RequireFeature(accessprofile.FeatureModelProviders))
 			{
 				provider.GET("", r.providerHandler.ListProviders)
 				provider.PUT("", r.providerHandler.AddProvider)
@@ -562,17 +565,17 @@ func (r *Router) Setup(engine *gin.Engine) {
 				// GET /models returns models available to the authenticated user
 				// in the selected tenant context.
 				model.GET("", r.providerHandler.ListModelsForUserInTenant)
-				model.PATCH("", r.tenantHandler.SetModels)
+				model.PATCH("", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.tenantHandler.SetModels)
 				// Tenant default-model selection (used by the agent page's useFetchDefaultModels hook)
 				model.GET("/default", r.tenantHandler.GetDefaultModels)
-				model.PATCH("/default", r.tenantHandler.SetDefaultModels)
+				model.PATCH("/default", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.tenantHandler.SetDefaultModels)
 
-				model.POST("/groups", r.providerHandler.CreateModelGroup)                  // CREATE MODEL GROUP
+				model.POST("/groups", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.providerHandler.CreateModelGroup)                  // CREATE MODEL GROUP
 				model.GET("/groups", r.providerHandler.ListModelGroups)                    // LIST MODEL GROUPS
 				model.GET("/groups/:group_name", r.providerHandler.ShowModelGroup)         // SHOW MODEL GROUP
-				model.DELETE("/groups/:group_name", r.providerHandler.DeleteModelGroup)    // DELETE MODEL GROUP
-				model.POST("/groups/:group_name/model", r.providerHandler.AddModelToGroup) // ADD MODEL TO GROUP
-				model.DELETE("/groups/:group_name/model", r.providerHandler.RemoveModelFromGroup)
+				model.DELETE("/groups/:group_name", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.providerHandler.DeleteModelGroup)    // DELETE MODEL GROUP
+				model.POST("/groups/:group_name/model", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.providerHandler.AddModelToGroup) // ADD MODEL TO GROUP
+				model.DELETE("/groups/:group_name/model", accessprofile.RequireFeature(accessprofile.FeatureModelProviders), r.providerHandler.RemoveModelFromGroup)
 			}
 
 			allModels := v1.Group("/all-models", ToggleModel())
@@ -621,7 +624,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 			v1.PUT("/compilation-template-groups/:group_id", r.compilationTemplateGroupHandler.Update)
 			v1.DELETE("/compilation-template-groups/:group_id", r.compilationTemplateGroupHandler.Delete)
 
-			connectors := v1.Group("/connectors")
+			connectors := v1.Group("/connectors", accessprofile.RequireFeature(accessprofile.FeatureDataSources))
 			{
 				connectors.GET("", r.connectorHandler.ListConnectors)
 				connectors.POST("", r.connectorHandler.CreateConnector)
@@ -640,7 +643,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 			}
 
 			// MCP server routes.
-			mcp := v1.Group("/mcp")
+			mcp := v1.Group("/mcp", accessprofile.RequireFeature(accessprofile.FeatureMCP))
 			{
 				mcp.POST("/servers", r.mcpHandler.CreateMCPServer)
 				mcp.GET("/servers", r.mcpHandler.ListMCPServers)
@@ -667,7 +670,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 				// Environments
 				system.GET("/environments", r.systemHandler.ListEnvironments)
 
-				tokens := system.Group("/tokens")
+				tokens := system.Group("/tokens", accessprofile.RequireFeature(accessprofile.FeatureAPI))
 				{
 					// list tokens /api/v1/system/tokens GET
 					tokens.GET("", r.systemHandler.ListAPIKeys)
@@ -677,7 +680,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 					tokens.DELETE("/:key", r.systemHandler.DeleteKey)
 				}
 
-				keys := system.Group("/keys")
+				keys := system.Group("/keys", accessprofile.RequireFeature(accessprofile.FeatureAPI))
 				{
 					// list keys /api/v1/system/keys GET
 					keys.GET("", r.systemHandler.ListAPIKeys)
@@ -699,7 +702,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 			}
 
 			// Chat Channel
-			chatChannel := v1.Group("/chat-channels")
+			chatChannel := v1.Group("/chat-channels", accessprofile.RequireFeature(accessprofile.FeatureChatChannels))
 			{
 				chatChannel.POST("", r.chatChannelHandler.CreateChatChannel)
 				chatChannel.GET("", r.chatChannelHandler.ListChatChannel)

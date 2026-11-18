@@ -85,6 +85,7 @@ export enum Routes {
   AdminServices = `${Admin}/services`,
   AdminUserManagement = `${Admin}/users`,
   AdminSandboxSettings = `${Admin}/sandbox-settings`,
+  AdminAccessProfiles = `${Admin}/access-profiles`,
   AdminWhitelist = `${Admin}/whitelist`,
   AdminRoles = `${Admin}/roles`,
   AdminMonitoring = `${Admin}/monitoring`,
@@ -341,9 +342,8 @@ const routeConfigOptions = [
       },
       {
         path: Routes.Integrations,
-        element: (
-          <Navigate to={`${Routes.Integrations}${Routes.Model}`} replace />
-        ),
+        Component: () =>
+          import('@/layouts/components/integrations-index-redirect'),
       },
       {
         Component: () => import('@/layouts/settings-page-layout'),
@@ -461,6 +461,10 @@ const routeConfigOptions = [
               {
                 path: Routes.AdminSandboxSettings,
                 Component: () => import('@/pages/admin/sandbox-settings'),
+              },
+              {
+                path: Routes.AdminAccessProfiles,
+                Component: () => import('@/pages/admin/access-profiles'),
               },
               ...(IS_ENTERPRISE
                 ? [

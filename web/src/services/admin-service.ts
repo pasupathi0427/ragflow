@@ -15,6 +15,11 @@
  */
 
 import { history } from '@/utils/simple-history-util';
+import type {
+  IAccessProfile,
+  IAccessProfileAssignment,
+} from '@/interfaces/database/access-profile';
+import type { IAccessProfileRequestBody } from '@/interfaces/request/access-profile';
 import axios from 'axios';
 
 import message from '@/components/ui/message';
@@ -341,3 +346,34 @@ export const testSandboxConnection = (params: {
     provider_type: params.providerType,
     config: params.config,
   });
+
+export const listAccessProfiles = () =>
+  request.get<ResponseData<IAccessProfile[]>>(api.adminAccessProfiles);
+
+export const createAccessProfile = (body: IAccessProfileRequestBody) =>
+  request.post<ResponseData<IAccessProfile>>(api.adminAccessProfiles, body);
+
+export const updateAccessProfile = (
+  profileId: string,
+  body: IAccessProfileRequestBody,
+) =>
+  request.put<ResponseData<IAccessProfile>>(
+    api.adminAccessProfile(encodeURIComponent(profileId)),
+    body,
+  );
+
+export const deleteAccessProfile = (profileId: string) =>
+  request.delete<ResponseData<void>>(
+    api.adminAccessProfile(encodeURIComponent(profileId)),
+  );
+
+export const listAccessProfileAssignments = () =>
+  request.get<ResponseData<IAccessProfileAssignment[]>>(
+    api.adminAccessProfileAssignments,
+  );
+
+export const assignAccessProfile = (email: string, profileId: string) =>
+  request.put<ResponseData<IAccessProfileAssignment>>(
+    api.adminAssignAccessProfile(encodeURIComponent(email)),
+    { profile_id: profileId },
+  );

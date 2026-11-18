@@ -534,6 +534,15 @@ const apiEndpoints = {
   adminSetSandboxConfig: `${restAPIv1}/admin/sandbox/config`,
   adminTestSandboxConnection: `${restAPIv1}/admin/sandbox/test`,
 
+  // Access profiles
+  adminAccessProfiles: `${restAPIv1}/admin/access-profiles`,
+  adminAccessProfile: (profileId: string) =>
+    `${restAPIv1}/admin/access-profiles/${profileId}`,
+  adminAccessProfileAssignments: `${restAPIv1}/admin/access-profile-assignments`,
+  adminAssignAccessProfile: (username: string) =>
+    `${restAPIv1}/admin/users/${username}/access-profile`,
+  myAccessFeatures: `${restAPIv1}/users/me/features`,
+
   // Skill spaces
   skillSpaces: `${restAPIv1}/skills/spaces`,
   skillSpace: (spaceId: string) => `${restAPIv1}/skills/spaces/${spaceId}`,

@@ -70,6 +70,7 @@ import { Routes } from '@/routes';
 import { LucideFilter, LucideSearch } from 'lucide-react';
 
 import useChangePasswordForm from './forms/change-password-form';
+import { UserAccessProfileSelect } from './access-profiles/user-access-profile-select';
 import useCreateUserForm from './forms/user-form';
 
 import {
@@ -312,6 +313,17 @@ function AdminUserManagement() {
             </Select>
           );
         },
+      }),
+
+      columnHelper.display({
+        id: 'access_profile',
+        header: t('accessProfile.profileColumn'),
+        cell: ({ row }) => (
+          <UserAccessProfileSelect
+            email={row.original.email}
+            isSuperuser={row.original.is_superuser}
+          />
+        ),
       }),
 
       columnHelper.display({

@@ -1,3 +1,4 @@
+import { AccessFeatureRouteGuard } from '@/components/access-feature-route-guard';
 import {
   RootLayoutBanner,
   RootLayoutContent,
@@ -46,7 +47,9 @@ export default function RootLayout() {
   return (
     <RootLayoutContainer>
       <RootLayoutContent>
-        <Outlet />
+        <AccessFeatureRouteGuard>
+          <Outlet />
+        </AccessFeatureRouteGuard>
       </RootLayoutContent>
     </RootLayoutContainer>
   );

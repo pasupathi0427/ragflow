@@ -4,6 +4,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccessFeature } from '@/constants/access-profile';
+import { useIsAccessFeatureEnabled } from '@/hooks/use-access-profile-request';
 import { Operator } from '@/pages/agent/constant';
 import { AgentFormContext, AgentInstanceContext } from '@/pages/agent/context';
 import useGraphStore from '@/pages/agent/store';
@@ -28,6 +30,7 @@ export function ToolPopover({ children }: React.PropsWithChildren) {
   );
   const { mcpIds } = useGetAgentMCPIds();
   const { updateNodeMCP } = useUpdateAgentNodeMCP();
+  const mcpEnabled = useIsAccessFeatureEnabled(AccessFeature.Mcp);
 
   useEffect(() => {
     const total = toolNames.length + mcpIds.length;
@@ -58,14 +61,16 @@ export function ToolPopover({ children }: React.PropsWithChildren) {
             <TabsTrigger value={ToolType.Common}>
               {t('flow.builtIn')}
             </TabsTrigger>
-            <TabsTrigger value={ToolType.MCP}>MCP</TabsTrigger>
+            {mcpEnabled && <TabsTrigger value={ToolType.MCP}>MCP</TabsTrigger>}
           </TabsList>
           <TabsContent value={ToolType.Common}>
             <ToolCommand />
           </TabsContent>
-          <TabsContent value={ToolType.MCP}>
-            <MCPCommand value={mcpIds} onChange={updateNodeMCP}></MCPCommand>
-          </TabsContent>
+          {mcpEnabled && (
+            <TabsContent value={ToolType.MCP}>
+              <MCPCommand value={mcpIds} onChange={updateNodeMCP}></MCPCommand>
+            </TabsContent>
+          )}
         </Tabs>
       </PopoverContent>
     </Popover>

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"ragflow/internal/accessprofile"
 	"ragflow/internal/common"
 	"ragflow/internal/entity"
 	"ragflow/internal/permission"
@@ -50,6 +51,9 @@ func (h *AuthHandler) ResolveMCPUser(ctx context.Context, authorization string) 
 			if err == nil {
 				err = errors.New("access is not allowed")
 			}
+			return nil, err
+		}
+		if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
 			return nil, err
 		}
 		return identity.User, nil
@@ -127,6 +131,11 @@ func (h *AuthHandler) BetaAuthMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
+				common.RespondError(c, common.CodeForbidden, err.Error())
+				c.Abort()
+				return
+			}
 			setAuthIdentity(c, identity)
 			c.Set("auth_via_api_token", true)
 			c.Next()
@@ -186,6 +195,11 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 				if err == nil {
 					err = errors.New("access is not allowed")
 				}
+				common.Respond(c, http.StatusForbidden, common.CodeForbidden, nil, err.Error())
+				c.Abort()
+				return
+			}
+			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
 				common.Respond(c, http.StatusForbidden, common.CodeForbidden, nil, err.Error())
 				c.Abort()
 				return

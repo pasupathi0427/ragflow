@@ -298,6 +298,8 @@ func autoMigrateModels() []interface{} {
 		// from these tables at runtime, so the Go side must guarantee they exist.
 		&entity.CompilationTemplate{},
 		&entity.CompilationTemplateGroup{},
+		&entity.AccessProfile{},
+		&entity.UserAccessProfile{},
 	}
 	dataModels = append(dataModels, permissionDataModelsEE()...)
 	dataModels = append(dataModels, billingDataModelsEE()...)

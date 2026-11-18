@@ -2,6 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import UserSetting from './index';
 
+// Access-profile switches come from the API; these tests see every feature on.
+jest.mock('@/hooks/use-access-profile-request', () => ({
+  useAccessFeatureFilter: (items: unknown[]) => items,
+  useIsAccessFeatureEnabled: () => true,
+  useIsAccessFeaturePathBlocked: () => false,
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));

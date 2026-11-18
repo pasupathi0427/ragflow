@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { RAGFlowTooltip } from '@/components/ui/tooltip';
 import { useVisibleIntegrationChildren } from '@/ee/hooks/use-visible-integration-children';
+import { useAccessFeatureFilter } from '@/hooks/use-access-profile-request';
 import { cn } from '@/lib/utils';
 import { LucideChevronDown } from 'lucide-react';
 import {
@@ -18,6 +19,7 @@ import {
   NavItem,
   useActiveNavigation,
 } from './navigation';
+import { getIntegrationAccessFeature } from './access-features';
 import { useSidebarCollapse } from './use-sidebar-collapse';
 
 function NavItemTooltip({
@@ -73,8 +75,12 @@ export function IntegrationsNavGroup() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const { collapsed } = useSidebarCollapse();
-  const integrationChildren =
+  const visibleIntegrationChildren =
     useVisibleIntegrationChildren(IntegrationChildren);
+  const integrationChildren = useAccessFeatureFilter(
+    visibleIntegrationChildren,
+    getIntegrationAccessFeature,
+  );
   const activeIntegrationKey = integrationChildren.find((child) =>
     matchesPath(pathname, child.path),
   )?.key;
@@ -94,6 +100,10 @@ export function IntegrationsNavGroup() {
 
   const Icon = IntegrationsNavItem.icon;
   const isActive = Boolean(activeIntegrationKey);
+
+  if (integrationChildren.length === 0) {
+    return null;
+  }
 
   return (
     <div>
