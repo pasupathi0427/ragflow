@@ -1,0 +1,3 @@
+# Local-only build certificates (see docker/docker-compose.local.yml); never commit them.
+*
+!.gitignore

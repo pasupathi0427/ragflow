@@ -1,0 +1,113 @@
+# Local-only: runs RAGFlow built from this checkout, with the API and Admin
+# servers. Nothing in the repository Dockerfile, .env, or the other compose
+# files changes.
+#
+# Behind the Zscaler proxy, every download during the build must trust the
+# Zscaler root. ./local-ca/bundle.pem (git-ignored) holds the public roots plus
+# that root; create it once with:
+#
+#   docker run --rm golang:1.27 cat /etc/ssl/certs/ca-certificates.crt > docker/local-ca/bundle.pem
+#   cat <path-to>/zscaler-root-1.crt >> docker/local-ca/bundle.pem
+#
+# Then, from the repository root:
+#
+#   # 1. Base images of the Dockerfile with the bundle trusted (only when the
+#   #    bundle or the upstream base images change)
+#   docker compose -f docker/docker-compose.local.yml build ragflow-ca-ubuntu ragflow-ca-runner
+#
+#   # 2. RAGFlow image from this checkout, using those base images
+#   docker build --platform linux/amd64 -f Dockerfile -t ragflow:access-profiles \
+#     --build-arg GOPROXY=https://proxy.golang.org,direct \
+#     --build-context ubuntu:24.04=docker-image://ragflow-local/ubuntu-ca:24.04 \
+#     --build-context infiniflow/github_action_runner:latest=docker-image://ragflow-local/github-action-runner-ca:latest \
+#     .
+#
+#   # 3. Run it. docker/local.env (after .env) moves host ports that clash on
+#   #    this machine, e.g. MinIO's 9000, which the Zscaler client holds.
+#   docker compose --env-file docker/.env --env-file docker/local.env -f docker/docker-compose.local.yml up -d
+#
+# Step 2 uses `docker build`, not compose: compose's bake builder drops the
+# github_action_runner override, so the Go stage would run without the bundle.
+# GOPROXY skips goproxy.cn (the Dockerfile default), which the proxy rejects.
+
+include:
+  - ./docker-compose-base.yml
+
+services:
+  # Base image of the Dockerfile's `base` and `production` stages.
+  ragflow-ca-ubuntu:
+    image: ragflow-local/ubuntu-ca:24.04
+    build:
+      context: ./local-ca
+      dockerfile_inline: |
+        FROM ubuntu:24.04
+        COPY bundle.pem /etc/ssl/local-ca/bundle.pem
+        RUN echo 'Acquire::https::CAInfo "/etc/ssl/local-ca/bundle.pem";' > /etc/apt/apt.conf.d/99local-ca
+        ENV SSL_CERT_FILE=/etc/ssl/local-ca/bundle.pem \
+            CURL_CA_BUNDLE=/etc/ssl/local-ca/bundle.pem \
+            REQUESTS_CA_BUNDLE=/etc/ssl/local-ca/bundle.pem \
+            NODE_EXTRA_CA_CERTS=/etc/ssl/local-ca/bundle.pem \
+            GIT_SSL_CAINFO=/etc/ssl/local-ca/bundle.pem \
+            UV_NATIVE_TLS=1
+    scale: 0
+
+  # Toolchain image of the Dockerfile's `web-builder` and `go-builder` stages.
+  ragflow-ca-runner:
+    image: ragflow-local/github-action-runner-ca:latest
+    build:
+      context: ./local-ca
+      dockerfile_inline: |
+        FROM infiniflow/github_action_runner:latest
+        USER root
+        COPY bundle.pem /etc/ssl/local-ca/bundle.pem
+        RUN if [ -f /etc/ssl/certs/ca-certificates.crt ]; then \
+              cat /etc/ssl/local-ca/bundle.pem >> /etc/ssl/certs/ca-certificates.crt; \
+            fi; \
+            if [ -d /etc/apt/apt.conf.d ]; then \
+              echo 'Acquire::https::CAInfo "/etc/ssl/local-ca/bundle.pem";' > /etc/apt/apt.conf.d/99local-ca; \
+            fi
+        ENV SSL_CERT_FILE=/etc/ssl/local-ca/bundle.pem \
+            CURL_CA_BUNDLE=/etc/ssl/local-ca/bundle.pem \
+            REQUESTS_CA_BUNDLE=/etc/ssl/local-ca/bundle.pem \
+            NODE_EXTRA_CA_CERTS=/etc/ssl/local-ca/bundle.pem \
+            GIT_SSL_CAINFO=/etc/ssl/local-ca/bundle.pem \
+            UV_NATIVE_TLS=1
+    scale: 0
+
+  # Same runtime settings as `ragflow-cpu` in docker-compose.yml, built locally.
+  # Built by the `docker build` command in the header, not by compose.
+  ragflow-local:
+    image: ragflow:access-profiles
+    pull_policy: never
+    depends_on:
+      mysql:
+        condition: service_healthy
+        required: false
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+      nproc:
+        soft: 65535
+        hard: 65535
+    command:
+      - --enable-adminserver
+      - --init-superuser
+    ports:
+      - ${SVR_WEB_HTTP_PORT}:80
+      - ${SVR_WEB_HTTPS_PORT}:443
+      - ${SVR_HTTP_PORT}:9380
+      - ${ADMIN_SVR_HTTP_PORT}:9381
+    volumes:
+      - ./ragflow-logs:/ragflow/logs
+      - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template
+      - ./entrypoint.sh:/ragflow/entrypoint.sh
+    env_file: .env
+    environment:
+      - KVROCKS_HOST=kvrocks
+      - KVROCKS_PORT=6379
+    networks:
+      - ragflow
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

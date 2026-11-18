@@ -34,6 +34,25 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-002] Local Docker build and run from the fork — 2026-11-18
+
+- **Type:** config
+- **Jira:** AI-146 (tooling used to test it)
+- **Requirement:** Build the RAGFlow image from this checkout and run it locally, behind the Zscaler TLS-intercepting proxy, without editing upstream Docker files.
+- **Change:**
+  - `docker/docker-compose.local.yml` runs the stack with the image `ragflow:access-profiles` built from this checkout. It uses the same settings as `ragflow-cpu` (API 9380, Admin 9381, web 80). It also defines two helper images that add `docker/local-ca/bundle.pem` to the Dockerfile's base images, so downloads during the build trust the corporate proxy.
+  - The RAGFlow image is built with `docker build ... --build-context`, not compose. Compose's bake builder dropped the `infiniflow/github_action_runner` override. `GOPROXY=https://proxy.golang.org,direct` skips `goproxy.cn`, which the proxy rejects. The full commands are in the compose file's header.
+  - `docker/local.env` is passed after `.env` with `--env-file`. It moves host ports that clash on a developer machine: MinIO to 9020 (Zscaler holds 9000 and 9010) and MySQL to 3307 (local MySQL). Containers still use the internal ports.
+  - `docker/local-ca/` holds the certificate bundle. Its `.gitignore` keeps everything except itself out of git.
+- **Files (new):** `docker/docker-compose.local.yml`, `docker/local.env`, `docker/local-ca/.gitignore`
+- **Files (upstream, edited):** none
+- **Database / config impact:** none (local runs only)
+- **Tests:** manual — the stack starts and the CUST-001 API checks pass against it.
+- **Upstream merge notes:**
+  - If upstream changes the `ragflow-cpu` service in `docker/docker-compose.yml`, mirror it in `ragflow-local`. That covers ports, volumes, command and environment.
+  - If upstream changes the Dockerfile's base images (`ubuntu:24.04`, `infiniflow/github_action_runner:latest`), update the helper images and the `--build-context` names.
+- **Commits:** `git log --grep "CUST-002"`
+
 ### [CUST-001] Access profiles: super admin controls which settings features users see — 2026-11-18
 
 - **Type:** feature, security
