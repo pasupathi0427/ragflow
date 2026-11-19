@@ -29,6 +29,7 @@ import (
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
 	modelModule "ragflow/internal/entity/models"
+	"ragflow/internal/globalmodel"
 	"ragflow/internal/modelcontext"
 	"ragflow/internal/permission"
 )
@@ -579,6 +580,9 @@ func (f *ModelFactory) defaultModelReference(ctx context.Context, modelType enti
 		return modelID, nil
 	}
 	if strings.TrimSpace(modelName) == "" {
+		if globalID := globalmodel.DefaultModelID(ctx, dao.DB, modelType); globalID != "" {
+			return globalID, nil
+		}
 		return "", fmt.Errorf("no default %s model is set: %w", modelType, ErrNoDefaultModel)
 	}
 	return modelName, nil
@@ -743,7 +747,7 @@ func (s *ModelFactory) resolveModelIdentity(ctx context.Context, requestedType e
 			return nil, fmt.Errorf("%w: model %q has no saved model row or valid composite name: %v", errModelConfigUnavailable, modelRef, parseErr)
 		}
 		identity.modelName = name
-		identity.providerEntity, err = s.modelProviderDAO.GetByTenantIDAndUserIDAndProviderName(ctx, dao.DB, tenantID, owner.UserID, providerName)
+		identity.providerEntity, err = globalmodel.ProviderByName(ctx, dao.DB, tenantID, owner.UserID, providerName)
 		if err != nil {
 			return nil, fmt.Errorf("%w: provider %q lookup failed: %w", errModelConfigUnavailable, providerName, err)
 		}
@@ -778,7 +782,18 @@ func (s *ModelFactory) resolveModelIdentity(ctx context.Context, requestedType e
 		}
 	}
 	provider, instance := identity.providerEntity, identity.instanceEntity
-	if provider.TenantID != tenantID {
+	globalProvider := globalmodel.IsGlobal(provider)
+	if globalProvider {
+		var check error
+		if identity.modelEntity != nil {
+			check = globalmodel.CheckUseModel(ctx, dao.DB, tenantID, provider, instance, identity.modelEntity)
+		} else {
+			check = globalmodel.CheckUse(ctx, dao.DB, tenantID, provider, instance, identity.modelName)
+		}
+		if err := check; err != nil {
+			return nil, fmt.Errorf("%w: %w", errModelConfigUnavailable, err)
+		}
+	} else if provider.TenantID != tenantID {
 		return nil, fmt.Errorf("%w: tenant %s can use only its owner's model configuration", errModelConfigUnavailable, tenantID)
 	}
 	if instance.ProviderID != provider.ID {
@@ -797,8 +812,9 @@ func (s *ModelFactory) resolveModelIdentity(ctx context.Context, requestedType e
 			checkedModels = []*entity.TenantModel{identity.modelEntity}
 		}
 	}
-	nonOwnerPermissionsChecked := false
-	if provider.UserID != owner.UserID {
+	// globalmodel.CheckUse already applied the access rules of a global provider.
+	nonOwnerPermissionsChecked := globalProvider
+	if !globalProvider && provider.UserID != owner.UserID {
 		if err := authorizeNonOwnerModelConfiguration(ctx, provider, instance, checkedModels); err != nil {
 			return nil, fmt.Errorf("%w: user %s cannot use model configuration owned by %s: %w", errModelConfigUnavailable, userID, provider.UserID, err)
 		}

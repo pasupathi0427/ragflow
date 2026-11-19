@@ -60,12 +60,13 @@ var (
 
 // Profile is the admin view of an access profile.
 type Profile struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Features    map[string]bool `json:"features"`
-	IsDefault   bool            `json:"is_default"`
-	MemberCount int64           `json:"member_count"`
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	Features     map[string]bool   `json:"features"`
+	GlobalModels GlobalModelAccess `json:"global_models"`
+	IsDefault    bool              `json:"is_default"`
+	MemberCount  int64             `json:"member_count"`
 }
 
 // ProfileInput is the admin request body for creating or updating a profile.
@@ -73,6 +74,9 @@ type ProfileInput struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Features    map[string]bool `json:"features"`
+	// GlobalModels is optional on update: when omitted the profile keeps its
+	// current global model access.
+	GlobalModels *GlobalModelAccess `json:"global_models,omitempty"`
 }
 
 // Assignment is one user's explicit profile assignment.
@@ -84,9 +88,10 @@ type Assignment struct {
 
 // UserFeatures is the feature view returned to a signed-in user.
 type UserFeatures struct {
-	ProfileID   string          `json:"profile_id"`
-	ProfileName string          `json:"profile_name"`
-	Features    map[string]bool `json:"features"`
+	ProfileID    string            `json:"profile_id"`
+	ProfileName  string            `json:"profile_name"`
+	Features     map[string]bool   `json:"features"`
+	GlobalModels GlobalModelAccess `json:"global_models"`
 }
 
 type cacheEntry struct {
@@ -104,6 +109,9 @@ type Service struct {
 	// generation increases on every invalidation, so a lookup that started
 	// before an admin change does not store its stale result.
 	generation uint64
+	// cacheDB is the database the cached lookups came from; a different
+	// dao.DB starts an empty cache.
+	cacheDB *gorm.DB
 }
 
 // NewService creates an access profile service backed by dao.DB.
@@ -149,12 +157,13 @@ func (s *Service) ensureDefaultProfile(ctx context.Context) (*entity.AccessProfi
 
 func toProfile(profile *entity.AccessProfile, memberCount int64) Profile {
 	return Profile{
-		ID:          profile.ID,
-		Name:        profile.Name,
-		Description: profile.Description,
-		Features:    featureSetFromStored(profile.Features).toResponse(),
-		IsDefault:   profile.ID == DefaultProfileID,
-		MemberCount: memberCount,
+		ID:           profile.ID,
+		Name:         profile.Name,
+		Description:  profile.Description,
+		Features:     featureSetFromStored(profile.Features).toResponse(),
+		GlobalModels: globalModelAccessFromStored(profile.GlobalModels),
+		IsDefault:    profile.ID == DefaultProfileID,
+		MemberCount:  memberCount,
 	}
 }
 
@@ -247,11 +256,18 @@ func (s *Service) Create(ctx context.Context, input ProfileInput) (*Profile, err
 	if err := s.checkNameAvailable(ctx, name, ""); err != nil {
 		return nil, err
 	}
+	globalModels := allGlobalModels()
+	if input.GlobalModels != nil {
+		if globalModels, err = normalizeGlobalModelAccess(*input.GlobalModels); err != nil {
+			return nil, err
+		}
+	}
 	profile := &entity.AccessProfile{
-		ID:          common.GenerateUUID(),
-		Name:        name,
-		Description: description,
-		Features:    features.toStored(),
+		ID:           common.GenerateUUID(),
+		Name:         name,
+		Description:  description,
+		Features:     features.toStored(),
+		GlobalModels: globalModels.toStored(),
 	}
 	if err := s.profileDAO.Create(ctx, dao.DB, profile); err != nil {
 		// A concurrent create can pass the pre-check and hit the unique index.
@@ -292,6 +308,13 @@ func (s *Service) Update(ctx context.Context, id string, input ProfileInput) (*P
 	profile.Name = name
 	profile.Description = description
 	profile.Features = features.toStored()
+	if input.GlobalModels != nil {
+		globalModels, err := normalizeGlobalModelAccess(*input.GlobalModels)
+		if err != nil {
+			return nil, err
+		}
+		profile.GlobalModels = globalModels.toStored()
+	}
 	if err := s.profileDAO.Update(ctx, dao.DB, profile); err != nil {
 		return nil, err
 	}
@@ -392,6 +415,11 @@ func (s *Service) AssignUser(ctx context.Context, email, profileID string) (*Ass
 func (s *Service) FeaturesForUser(ctx context.Context, userID string) (UserFeatures, error) {
 	now := time.Now()
 	s.mu.Lock()
+	if s.cacheDB != dao.DB {
+		s.cache = make(map[string]cacheEntry)
+		s.cacheDB = dao.DB
+		s.generation++
+	}
 	entry, ok := s.cache[userID]
 	generation := s.generation
 	s.mu.Unlock()
@@ -453,12 +481,13 @@ func (s *Service) loadFeatures(ctx context.Context, userID string) (UserFeatures
 	}
 	if profile == nil {
 		// No admin has configured profiles yet: nothing is restricted.
-		return UserFeatures{ProfileID: DefaultProfileID, ProfileName: defaultProfileName, Features: allEnabled().toResponse()}, nil
+		return UserFeatures{ProfileID: DefaultProfileID, ProfileName: defaultProfileName, Features: allEnabled().toResponse(), GlobalModels: allGlobalModels()}, nil
 	}
 	return UserFeatures{
-		ProfileID:   profile.ID,
-		ProfileName: profile.Name,
-		Features:    featureSetFromStored(profile.Features).toResponse(),
+		ProfileID:    profile.ID,
+		ProfileName:  profile.Name,
+		Features:     featureSetFromStored(profile.Features).toResponse(),
+		GlobalModels: globalModelAccessFromStored(profile.GlobalModels),
 	}, nil
 }
 

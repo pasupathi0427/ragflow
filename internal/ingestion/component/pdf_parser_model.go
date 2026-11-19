@@ -25,6 +25,7 @@ import (
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
 	modelModule "ragflow/internal/entity/models"
+	"ragflow/internal/globalmodel"
 	"ragflow/internal/ingestion/component/schema"
 	"ragflow/internal/parser/parser"
 
@@ -91,7 +92,7 @@ func maybeDispatchTenantPDFParser(ctx context.Context, db *gorm.DB, filename str
 			return parser.ParseResult{}, true, fmt.Errorf("parser: tenant owner lookup: %w", ownerErr)
 		}
 		ownerUserID := owner.UserID
-		provider, err = providerDAO.GetByTenantIDAndUserIDAndProviderName(ctx, db, tenantID, ownerUserID, providerName)
+		provider, err = globalmodel.ProviderByName(ctx, db, tenantID, ownerUserID, providerName)
 		if err == nil {
 			instance, err = instanceDAO.GetByProviderIDAndInstanceName(ctx, db, provider.ID, instanceName)
 		}
@@ -115,8 +116,11 @@ func maybeDispatchTenantPDFParser(ctx context.Context, db *gorm.DB, filename str
 	if err != nil {
 		return parser.ParseResult{}, true, fmt.Errorf("parser: tenant PDF model lookup: %w", err)
 	}
-	if tenantID == "" || provider.TenantID != tenantID || instance.ProviderID != provider.ID {
+	if tenantID == "" || (!globalmodel.IsGlobal(provider) && provider.TenantID != tenantID) || instance.ProviderID != provider.ID {
 		return parser.ParseResult{}, true, fmt.Errorf("parser: selected PDF model does not belong to this tenant/provider")
+	}
+	if err := globalmodel.CheckUseModel(ctx, db, tenantID, provider, instance, model); err != nil {
+		return parser.ParseResult{}, true, fmt.Errorf("parser: selected PDF model: %w", err)
 	}
 	if model.Status != "active" || instance.Status != "active" || !entity.ModelType(model.ModelType).Has(entity.ModelTypeOCR) {
 		return parser.ParseResult{}, true, fmt.Errorf("parser: selected PDF model and instance must be active OCR configuration")

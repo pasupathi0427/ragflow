@@ -125,6 +125,7 @@ func (r *Router) Setup(engine *gin.Engine) {
 			protected.GET("/all-models/:model_name", r.handler.ShowModel)
 
 			accessprofile.RegisterAdminRoutes(protected)
+			RegisterGlobalModelRoutes(protected)
 
 			RegisterEERouter(protected, r)
 		}

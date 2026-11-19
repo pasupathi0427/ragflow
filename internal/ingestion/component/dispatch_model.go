@@ -31,6 +31,7 @@ import (
 	"ragflow/internal/dao/transaction"
 	"ragflow/internal/entity"
 	modelModule "ragflow/internal/entity/models"
+	"ragflow/internal/globalmodel"
 	"ragflow/internal/ingestion/component/schema"
 	"ragflow/internal/modelcontext"
 	"ragflow/internal/permission"
@@ -93,7 +94,20 @@ func defaultResolveTenantModelByType(ctx context.Context, db *gorm.DB, tenantID 
 		return nil, "", nil, 0, fmt.Errorf("invalid model type: %s", modelType)
 	}
 	if modelID == "" {
-		return nil, "", nil, 0, fmt.Errorf("no default %s model is set", modelType)
+		// Only a member with no default of either form falls back to the
+		// admin's global default.
+		globalID := ""
+		if tenantModelIDByType(membership, modelType) == "" {
+			globalID = globalmodel.DefaultModelID(ctx, db, modelType)
+		}
+		if globalID == "" {
+			return nil, "", nil, 0, fmt.Errorf("no default %s model is set", modelType)
+		}
+		resolved, err := resolveModelConfigByID(ctx, db, tenantID, modelType, globalID)
+		if err != nil {
+			return nil, "", nil, 0, err
+		}
+		return resolved.driver, resolved.model.ModelName, resolved.apiConfig, resolved.contextLength, nil
 	}
 	if tenantModelID := tenantModelIDByType(membership, modelType); tenantModelID != "" {
 		resolved, err := resolveModelConfigByRef(ctx, db, tenantID, modelType, tenantModelID)
@@ -269,8 +283,7 @@ func resolveModelConfigByID(ctx context.Context, db *gorm.DB, tenantID string, m
 	if err != nil {
 		return nil, fmt.Errorf("resolve tenant owner for model lookup: %w", err)
 	}
-	providers := db.Session(&gorm.Session{}).Model(&entity.TenantModelProvider{}).
-		Select("id").Where("tenant_id = ? AND user_id = ?", tenantID, owner.UserID)
+	providers := globalmodel.OwnedOrGlobalProviderIDs(db, tenantID, owner.UserID)
 	scopedDB := db.Session(&gorm.Session{}).Where("provider_id IN (?)", providers)
 	modelObj, err := modelDAO.GetByID(ctx, scopedDB, modelID)
 	if err != nil {
@@ -286,7 +299,7 @@ func resolveModelConfigByID(ctx context.Context, db *gorm.DB, tenantID string, m
 		}
 		return nil, err
 	}
-	if provider.TenantID != tenantID {
+	if !globalmodel.IsGlobal(provider) && provider.TenantID != tenantID {
 		return nil, errors.New("model not found or inaccessible")
 	}
 	if modelObj.Status != "active" {
@@ -297,6 +310,9 @@ func resolveModelConfigByID(ctx context.Context, db *gorm.DB, tenantID string, m
 	}
 	instance, err := instanceDAO.GetByID(ctx, db, modelObj.InstanceID)
 	if err != nil {
+		return nil, err
+	}
+	if err := globalmodel.CheckUseModel(ctx, db, tenantID, provider, instance, modelObj); err != nil {
 		return nil, err
 	}
 	// A disabled instance must not be used: its credentials are no longer
@@ -362,6 +378,9 @@ func resolveModelConfigFromProviderInstance(ctx context.Context, db *gorm.DB, te
 	instance, err := instanceDAO.GetByProviderIDAndInstanceName(ctx, db, provider.ID, instanceName)
 	if err != nil {
 		return nil, "", nil, 0, fmt.Errorf("instance %q lookup failed: %w", instanceName, err)
+	}
+	if err := globalmodel.CheckUse(ctx, db, tenantID, provider, instance, pureModelName); err != nil {
+		return nil, "", nil, 0, err
 	}
 	// The instance named by the reference must be usable. A two-part
 	// "model@provider" reference names the "default" instance implicitly, so
@@ -471,5 +490,5 @@ func getTenantModelProviderByName(ctx context.Context, db *gorm.DB, tenantID, pr
 	if err != nil {
 		return nil, err
 	}
-	return dao.NewTenantModelProviderDAO().GetByTenantIDAndUserIDAndProviderName(ctx, db, tenantID, owner.UserID, providerName)
+	return globalmodel.ProviderByName(ctx, db, tenantID, owner.UserID, providerName)
 }

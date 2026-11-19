@@ -26,6 +26,14 @@
 #   #    this machine, e.g. MinIO's 9000, which the Zscaler client holds.
 #   docker compose --env-file docker/.env --env-file docker/local.env -f docker/docker-compose.local.yml up -d
 #
+# Secrets go in ./local-ca/secrets.env (git-ignored, optional), read after
+# .env. Global model API keys are stored encrypted and need
+# RAGFLOW_CONNECTOR_KEY, a base64 32-byte key; create it once with:
+#
+#   printf 'RAGFLOW_CONNECTOR_KEY=%s\n' "$(head -c 32 /dev/urandom | base64)" > docker/local-ca/secrets.env
+#
+# Keep a backup of that key: without it, stored global keys cannot be read.
+#
 # Step 2 uses `docker build`, not compose: compose's bake builder drops the
 # github_action_runner override, so the Go stage would run without the bundle.
 # GOPROXY skips goproxy.cn (the Dockerfile default), which the proxy rejects.
@@ -102,7 +110,10 @@ services:
       - ./ragflow-logs:/ragflow/logs
       - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template
       - ./entrypoint.sh:/ragflow/entrypoint.sh
-    env_file: .env
+    env_file:
+      - .env
+      - path: ./local-ca/secrets.env
+        required: false
     environment:
       - KVROCKS_HOST=kvrocks
       - KVROCKS_PORT=6379

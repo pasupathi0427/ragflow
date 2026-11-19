@@ -28,6 +28,7 @@ import (
 	"ragflow/internal/common"
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
+	"ragflow/internal/globalmodel"
 )
 
 // The judge used to be a process-wide singleton built from the environment.
@@ -223,9 +224,14 @@ func buildDecisionBackendFromModel(ctx context.Context, scope decisionScope, mod
 	// a CLI or test run has no tenant to match and must not lose its judge.
 	if scope.tenantID != "" {
 		var provider entity.TenantModelProvider
-		if err := dao.DB.Where("id = ?", instance.ProviderID).First(&provider).Error; err != nil || provider.TenantID != scope.tenantID {
+		if err := dao.DB.Where("id = ?", instance.ProviderID).First(&provider).Error; err != nil || (provider.TenantID != scope.tenantID && !globalmodel.IsGlobal(&provider)) {
 			common.WarnCtx(ctx, "agentic_rag: decision model belongs to another tenant, falling back to the env backend",
 				zap.String("model_id", modelID), zap.String("tenant_id", scope.tenantID))
+			return nil
+		}
+		if err := globalmodel.CheckUseModel(ctx, dao.DB, scope.tenantID, &provider, &instance, &model); err != nil {
+			common.WarnCtx(ctx, "agentic_rag: decision model is not usable, falling back to the env backend",
+				zap.String("model_id", modelID), zap.Error(err))
 			return nil
 		}
 	}

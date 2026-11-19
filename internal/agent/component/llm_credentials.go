@@ -12,6 +12,7 @@ import (
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
 	"ragflow/internal/entity/models"
+	"ragflow/internal/globalmodel"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -153,7 +154,7 @@ func resolveTenantModelInstanceCredentials(ctx context.Context, db *gorm.DB, tid
 		return "", baseURL, false
 	}
 	ownerUserID := owner.UserID
-	provider, err := dao.NewTenantModelProviderDAO().GetByTenantIDAndUserIDAndProviderName(ctx, db, tid, ownerUserID, providerName)
+	provider, err := globalmodel.ProviderByName(ctx, db, tid, ownerUserID, providerName)
 	if err != nil || provider == nil {
 		common.Debug("llm credentials: new-table fallback: provider not found", zap.String("provider", providerName), zap.Error(err))
 		return "", baseURL, false
@@ -179,6 +180,14 @@ func resolveTenantModelInstanceCredentials(ctx context.Context, db *gorm.DB, tid
 		return "", baseURL, false
 	}
 
+	if err := globalmodel.CheckUse(ctx, db, tid, provider, instance, modelName); err != nil {
+		common.Debug("llm credentials: new-table fallback: model not usable", zap.String("provider", providerName), zap.Error(err))
+		return "", baseURL, false
+	}
+	if globalmodel.IsGlobal(provider) && !globalmodel.KeyMayGoTo(instance, baseURL) {
+		common.Debug("llm credentials: global model endpoint override refused", zap.String("provider", providerName))
+		return "", baseURL, false
+	}
 	apiKey := instance.APIKey
 	if !savedKeyMayGoTo(provider.ProviderName, instance, baseURL) {
 		common.Debug("llm credentials: saved key not used with a base_url override of another origin", zap.String("provider", providerName))
@@ -266,7 +275,7 @@ func resolveTenantCompositeModel(ctx context.Context, db *gorm.DB, modelRef, api
 	if err != nil {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("resolve tenant owner %q: %w", tid, err)
 	}
-	provider, err := dao.NewTenantModelProviderDAO().GetByTenantIDAndUserIDAndProviderName(ctx, db, tid, owner.UserID, providerName)
+	provider, err := globalmodel.ProviderByName(ctx, db, tid, owner.UserID, providerName)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return notFound()
 	}
@@ -282,6 +291,9 @@ func resolveTenantCompositeModel(ctx context.Context, db *gorm.DB, modelRef, api
 	}
 	if instance == nil {
 		return notFound()
+	}
+	if err := globalmodel.CheckUse(ctx, db, tid, provider, instance, modelName); err != nil {
+		return "", "", apiKey, baseURL, 0, false, err
 	}
 	rows, err := dao.NewTenantModelDAO().GetModelsByProviderIDAndInstanceIDAndModelName(ctx, db, provider.ID, instance.ID, modelName)
 	if err != nil {
@@ -370,7 +382,7 @@ func resolveTenantModelByTenantModelID(ctx context.Context, db *gorm.DB, tid, mo
 	if err != nil {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("resolve provider for tenant model id %q: %w", modelID, err)
 	}
-	if provider.TenantID != tid {
+	if !globalmodel.IsGlobal(provider) && provider.TenantID != tid {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("tenant %s has no access to model id %s", tid, modelID)
 	}
 
@@ -378,10 +390,16 @@ func resolveTenantModelByTenantModelID(ctx context.Context, db *gorm.DB, tid, mo
 	if err != nil {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("resolve instance for tenant model id %q: %w", modelID, err)
 	}
+	if err := globalmodel.CheckUseModel(ctx, db, tid, provider, instance, model); err != nil {
+		return "", "", apiKey, baseURL, 0, false, err
+	}
 	if entity.ModelType(model.ModelType).Has(entity.ModelTypeDecision) && allowedTypes.Has(entity.ModelTypeDecision) {
 		if instance.ProviderID != provider.ID || !strings.EqualFold(strings.TrimSpace(instance.Status), "active") {
 			return "", "", apiKey, baseURL, 0, false, fmt.Errorf("tenant model id %s has an inactive or mismatched instance", modelID)
 		}
+	}
+	if globalmodel.IsGlobal(provider) && !globalmodel.KeyMayGoTo(instance, baseURL) {
+		return "", "", apiKey, baseURL, 0, false, globalmodel.ErrEndpointOverride
 	}
 	apiKey, baseURL = fillInstanceCredentials(provider.ProviderName, instance, apiKey, baseURL)
 	return model.ModelName, provider.ProviderName, apiKey, baseURL, entity.ModelType(model.ModelType), true, nil
@@ -399,7 +417,7 @@ func resolveTenantModelByInstanceID(ctx context.Context, db *gorm.DB, tid, insta
 	if err != nil {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("resolve provider for tenant model instance id %q: %w", instanceID, err)
 	}
-	if provider.TenantID != tid {
+	if !globalmodel.IsGlobal(provider) && provider.TenantID != tid {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("tenant %s has no access to model instance id %s", tid, instanceID)
 	}
 
@@ -426,10 +444,16 @@ func resolveTenantModelByInstanceID(ctx context.Context, db *gorm.DB, tid, insta
 	if len(candidates) > 1 {
 		return "", "", apiKey, baseURL, 0, false, fmt.Errorf("tenant model instance id %s has %d active %s models; use tenant_model.id or model@instance@provider", instanceID, len(candidates), allowedTypes)
 	}
+	if err := globalmodel.CheckUseModel(ctx, db, tid, provider, instance, candidates[0]); err != nil {
+		return "", "", apiKey, baseURL, 0, false, err
+	}
 	if entity.ModelType(candidates[0].ModelType).Has(entity.ModelTypeDecision) {
 		if !strings.EqualFold(strings.TrimSpace(instance.Status), "active") {
 			return "", "", apiKey, baseURL, 0, false, fmt.Errorf("decision model instance id %s requires an active instance", instanceID)
 		}
+	}
+	if globalmodel.IsGlobal(provider) && !globalmodel.KeyMayGoTo(instance, baseURL) {
+		return "", "", apiKey, baseURL, 0, false, globalmodel.ErrEndpointOverride
 	}
 	apiKey, baseURL = fillInstanceCredentials(provider.ProviderName, instance, apiKey, baseURL)
 	return candidates[0].ModelName, provider.ProviderName, apiKey, baseURL, entity.ModelType(candidates[0].ModelType), true, nil

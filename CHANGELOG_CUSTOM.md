@@ -34,6 +34,51 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-003] Global model providers — 2026-11-19
+
+- **Type:** feature, security
+- **Jira:** sub-task of AI-145 "RAG Platform (RAGFlow) customization"
+- **Requirement:** A super admin configures model providers, keys and models once, and every user can call them without their own setup. Users can still add their own providers. Global models are read-only for users: they can be used but never edited, disabled, deleted, re-keyed or read. Access profiles decide which global models a user may call.
+- **Status:** A1 backend done. Still to do: A2 admin UI (Global models page) and A3 user side (global models in model lists, Global badge, per-profile model access in the profile card).
+- **Change (A1):**
+  - **Storage.** Global providers, instances and models live in the regular `tenant_model_provider`, `tenant_model_instance` and `tenant_model` tables, owned by the reserved tenant and user ID `global` (`entity.GlobalModelOwnerID`). Upstream's catalog and provider handling, and references by model ID, work unchanged. Every provider a user can configure can also be configured globally.
+  - **One use rule.** `internal/globalmodel` provides `ProviderByName` (the tenant's own provider first, then global), `OwnedOrGlobalProviderIDs`, and `CheckUse`.
+    - `CheckUse` refuses a global model unless its instance and model are enabled and the calling user's access profile allows it. The caller is the request's user, or the tenant owner for background work.
+    - It replaces the tenant-ownership check at the 6 places that *use* a model: `service/model_factory.go`, `agent/component/llm_credentials.go` (by name, by model ID, by instance ID, and the credential fallback), `ingestion/component/dispatch_model.go` (by ID, by name, provider by name), `ingestion/component/pdf_parser_model.go`, and `agentic_rag/decision_config.go`.
+    - For a global provider, the factory skips the upstream non-owner and per-resource permission checks, because `CheckUse` applies its rules instead.
+  - **Read-only for users.** The *manage* paths (`/providers/...`, which go through `findProviderByIDOrNameInCurrentTenant` and `resolveInstance` in `service/model_service.go`) are not changed. Their tenant check never matches `global`, so users cannot list, edit, disable, delete or re-key a global provider, instance or model.
+  - **Strict stop.** Disabling a global instance or model (status `inactive`) refuses every call at once, for every user, including existing chats, datasets and agents. A profile that doesn't allow a global model refuses every call by its users. A refused model in agentic RAG's decision config falls back to the environment judge, never to the refused model.
+  - **Encrypted keys.**
+    - Global API keys are AES-256-GCM encrypted (`enc:model:v1:` prefix) with `RAGFLOW_CONNECTOR_KEY` (`common/model_api_key.go`). Without the key, a global key cannot be saved.
+    - A GORM `AfterFind` hook (`entity/global_model.go`) decrypts keys on load, so every place that reads `instance.APIKey` gets the plaintext without changes. If decryption fails, the key is cleared and the call fails.
+    - A `BeforeSave` hook re-encrypts a global key if loaded code saves the instance back.
+    - Keys are never returned: the admin listing shows `has_api_key` and `••••1234`.
+  - **Global defaults.** The admin sets a default model per type (chat, embedding, speech2text, image2text, rerank, tts, ocr, decision) in `system_settings` (`global_models.defaults`). A user with no default of that type gets the global one, applied at lookup time with no copying. A user's own default still wins.
+  - **Access profiles.** New `global_models` setting (`{"all": true}` by default, or a list of global model IDs). It's returned in `/users/me/features`, and an update that omits it keeps the current value.
+  - **Admin API** (superuser only, admin console): `/api/v1/admin/global-models` — list, catalog, providers, instances (create, update key/endpoint/status, delete, test connection), models (add, enable/disable, delete), and defaults. Deletes are refused, with counts, while a dataset, chat, memory, agent, user default or global default uses the model. Every change is audit-logged without keys.
+- **Files (new):** `internal/globalmodel/{globalmodel,defaults}.go` + test, `internal/common/model_api_key.go` + test, `internal/entity/global_model.go`, `internal/accessprofile/global_models.go`, `internal/service/global_model_admin.go`, `internal/service/global_model_test.go`, `internal/admin/global_models_handler.go`, `internal/ingestion/component/global_model_test.go`, `internal/agent/component/global_model_test.go`
+- **Files (upstream, edited — check these first after an upstream merge):**
+  - `internal/service/model_factory.go`: provider by name through `globalmodel.ProviderByName`; global branch before the tenant check; non-owner checks skipped for global; global default fallback in `defaultModelReference`.
+  - `internal/agent/component/llm_credentials.go`: 4 lookups (see above).
+  - `internal/ingestion/component/dispatch_model.go`: owned-or-global scope, `CheckUse` in both resolvers, provider by name, global default fallback.
+  - `internal/ingestion/component/dispatch_model_test.go`: the scoped-SQL test expects the owned-or-global scope (still fully parameter-bound).
+  - `internal/ingestion/component/pdf_parser_model.go`, `internal/agentic_rag/decision_config.go`: global exception + `CheckUse`.
+  - `internal/admin/router.go`: `RegisterGlobalModelRoutes(protected)`.
+  - Own files from CUST-001: `internal/entity/access_profile.go` (`global_models` column), `internal/dao/access_profile.go`, `internal/accessprofile/service.go`, `internal/admin/access_profile_routes_test.go` (now covers the global-model routes too).
+- **Database / config impact:**
+  - New column `access_profile.global_models` (AutoMigrate).
+  - New `system_settings` row `global_models.defaults`, created on the first save.
+  - Global rows in the three provider tables with tenant and user `global`.
+  - `RAGFLOW_CONNECTOR_KEY` is required to save global keys. For local runs it comes from `docker/local-ca/secrets.env` (git-ignored); back it up.
+- **Tests:**
+  - `bash build.sh --test ./internal/globalmodel/... ./internal/common/... ./internal/service/... ./internal/agent/component/... ./internal/ingestion/component/... ./internal/accessprofile/... ./internal/admin/...`
+  - In a CGO-free container, four PDF/DOCX parser tests in `ingestion/component` fail on `main` too (they need the native libraries).
+- **Upstream merge notes:**
+  - Grep for `globalmodel.` to find every hook.
+  - If upstream adds a new place that loads a provider or instance to *call* a model, route it through `globalmodel.ProviderByName` / `CheckUse`. If it's a *manage* path, leave it tenant-only, which keeps global models read-only.
+  - If upstream adds its own `AfterFind` / `BeforeSave` on `TenantModelInstance`, the build fails on the duplicate method; merge the logic into `entity/global_model.go`.
+- **Commits:** `git log --grep "CUST-003"`
+
 ### [CUST-002] Local Docker build and run from the fork — 2026-11-18
 
 - **Type:** config
@@ -44,6 +89,7 @@ Before merging or rebasing onto upstream, read this file to see which files carr
   - The RAGFlow image is built with `docker build ... --build-context`, not compose. Compose's bake builder dropped the `infiniflow/github_action_runner` override. `GOPROXY=https://proxy.golang.org,direct` skips `goproxy.cn`, which the proxy rejects. The full commands are in the compose file's header.
   - `docker/local.env` is passed after `.env` with `--env-file`. It moves host ports that clash on a developer machine: MinIO to 9020 (Zscaler holds 9000 and 9010) and MySQL to 3307 (local MySQL). Containers still use the internal ports.
   - `docker/local-ca/` holds the certificate bundle. Its `.gitignore` keeps everything except itself out of git.
+  - Local secrets go in `docker/local-ca/secrets.env` (git-ignored, optional), read by `ragflow-local` after `.env`. `RAGFLOW_CONNECTOR_KEY` lives there for CUST-003.
 - **Files (new):** `docker/docker-compose.local.yml`, `docker/local.env`, `docker/local-ca/.gitignore`
 - **Files (upstream, edited):** none
 - **Database / config impact:** none (local runs only)

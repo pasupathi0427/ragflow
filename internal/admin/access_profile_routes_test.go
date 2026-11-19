@@ -28,7 +28,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestAccessProfileRoutesRequireAdminAuth(t *testing.T) {
+func TestCustomAdminRoutesRequireAdminAuth(t *testing.T) {
 	engine := gin.New()
 	NewRouter(NewHandler(NewService())).Setup(engine)
 
@@ -40,6 +40,19 @@ func TestAccessProfileRoutesRequireAdminAuth(t *testing.T) {
 		{http.MethodDelete, "/api/v1/admin/access-profiles/p1"},
 		{http.MethodGet, "/api/v1/admin/access-profile-assignments"},
 		{http.MethodPut, "/api/v1/admin/users/a@example.com/access-profile"},
+		{http.MethodGet, "/api/v1/admin/global-models"},
+		{http.MethodGet, "/api/v1/admin/global-models/catalog"},
+		{http.MethodPost, "/api/v1/admin/global-models/providers"},
+		{http.MethodDelete, "/api/v1/admin/global-models/providers/p1"},
+		{http.MethodPost, "/api/v1/admin/global-models/providers/p1/instances"},
+		{http.MethodPost, "/api/v1/admin/global-models/providers/p1/connection"},
+		{http.MethodPut, "/api/v1/admin/global-models/instances/i1"},
+		{http.MethodDelete, "/api/v1/admin/global-models/instances/i1"},
+		{http.MethodPost, "/api/v1/admin/global-models/instances/i1/models"},
+		{http.MethodPut, "/api/v1/admin/global-models/models/m1/status"},
+		{http.MethodDelete, "/api/v1/admin/global-models/models/m1"},
+		{http.MethodGet, "/api/v1/admin/global-models/defaults"},
+		{http.MethodPut, "/api/v1/admin/global-models/defaults"},
 	} {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {
 			recorder := httptest.NewRecorder()

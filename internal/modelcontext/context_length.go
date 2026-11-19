@@ -27,6 +27,7 @@ import (
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
 	"ragflow/internal/entity/models"
+	"ragflow/internal/globalmodel"
 )
 
 // ResolveModelContentLength returns the chat model's effective context window
@@ -104,7 +105,7 @@ func lookupTenantModel(ctx context.Context, db *gorm.DB, tenantID, modelRef, pur
 			return nil
 		}
 		ownerUserID := owner.UserID
-		provider, err := dao.NewTenantModelProviderDAO().GetByTenantIDAndUserIDAndProviderName(ctx, db, tenantID, ownerUserID, providerName)
+		provider, err := globalmodel.ProviderByName(ctx, db, tenantID, ownerUserID, providerName)
 		if err != nil || provider == nil {
 			return nil
 		}

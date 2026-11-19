@@ -80,9 +80,10 @@ func (d *AccessProfileDAO) Update(ctx context.Context, db *gorm.DB, profile *ent
 	return db.WithContext(ctx).Model(&entity.AccessProfile{}).
 		Where("id = ?", profile.ID).
 		Updates(map[string]interface{}{
-			"name":        profile.Name,
-			"description": profile.Description,
-			"features":    profile.Features,
+			"name":          profile.Name,
+			"description":   profile.Description,
+			"features":      profile.Features,
+			"global_models": profile.GlobalModels,
 		}).Error
 }
 

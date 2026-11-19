@@ -23,6 +23,9 @@ type AccessProfile struct {
 	Name        string  `gorm:"column:name;size:128;not null;uniqueIndex:idx_access_profile_name" json:"name"`
 	Description string  `gorm:"column:description;size:512;not null;default:''" json:"description"`
 	Features    JSONMap `gorm:"column:features;type:longtext" json:"features"`
+	// GlobalModels is {"all": bool, "model_ids": [...]}; nil allows every
+	// global model.
+	GlobalModels JSONMap `gorm:"column:global_models;type:longtext" json:"global_models"`
 	BaseModel
 }
 

@@ -350,12 +350,14 @@ func TestResolveModelConfigByIDScopedQuerySQL(t *testing.T) {
 		t.Fatalf("model queries=%d, want one scoped lookup: %+v", len(queries), queries)
 	}
 	query := queries[0]
-	const wantSQL = "SELECT * FROM `tenant_model` WHERE provider_id IN (SELECT `id` FROM `tenant_model_provider` WHERE tenant_id = ? AND user_id = ?) AND id = ? LIMIT 1"
+	// The scope covers the tenant owner's providers and the global ones
+	// (globalmodel.OwnedOrGlobalProviderIDs); every value stays bound.
+	const wantSQL = "SELECT * FROM `tenant_model` WHERE provider_id IN (SELECT `id` FROM `tenant_model_provider` WHERE (tenant_id = ? AND user_id = ?) OR (tenant_id = ? AND user_id = ?)) AND id = ? LIMIT 1"
 	if query.sql != wantSQL {
 		t.Errorf("scoped SQL=%q, want %q", query.sql, wantSQL)
 	}
-	if len(query.vars) != 3 || query.vars[0] != tenantID || query.vars[2] != modelID {
-		t.Errorf("bound vars=%#v, want tenant ID, owner user ID, then model ID", query.vars)
+	if len(query.vars) != 5 || query.vars[0] != tenantID || query.vars[2] != entity.GlobalModelOwnerID || query.vars[3] != entity.GlobalModelOwnerID || query.vars[4] != modelID {
+		t.Errorf("bound vars=%#v, want tenant ID, owner user ID, the global owner twice, then model ID", query.vars)
 	}
 	if strings.Contains(query.sql, tenantID) || strings.Contains(query.sql, modelID) {
 		t.Errorf("an ID was interpolated into SQL: %q", query.sql)
