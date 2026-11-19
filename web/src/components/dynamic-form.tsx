@@ -942,7 +942,7 @@ const DynamicForm = {
             }}
           >
             <>
-              {fields.map((field) => {
+              {fields.map((field, index) => {
                 const shouldShow = field.shouldRender
                   ? field.shouldRender(formValues)
                   : true;
@@ -952,7 +952,9 @@ const DynamicForm = {
                 if (!shouldShow) return null;
                 return (
                   <div
-                    key={field.name}
+                    // A config may declare one name twice (a visible field
+                    // and a hidden copy); the position keeps keys unique.
+                    key={`${field.name}-${index}`}
                     className={cn({ hidden: field.hidden })}
                   >
                     <RenderField

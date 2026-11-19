@@ -34,6 +34,22 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-004] Fix duplicated fields in data source forms (Confluence Space Key) — 2026-11-19
+
+- **Type:** fix
+- **Requirement:** In the Confluence data source form, the Space Key field repeated many times after switching the index mode.
+- **Change:**
+  - `confluence-constant.tsx` declares `config.space`, `config.page_id` and `config.index_recursively` twice: a visible field and a hidden copy.
+  - `DynamicForm` keyed each field by `field.name`, so the two entries got the same React key. React warned "Encountered two children with the same key" and duplicated DOM nodes on re-render.
+  - Fields are now keyed by name plus position, which also protects every other data source form with repeated names.
+  - Present in upstream v1.0.0 and in upstream `main` as of 2026-11-19. A good candidate to send upstream.
+- **Files (new):** `web/src/pages/user-setting/data-source/__tests__/confluence-form-fields.test.tsx`. It renders the real Confluence config, switches the mode six times, and asserts no duplicate-key warning and exactly one visible Space Key.
+- **Files (upstream, edited):** `web/src/components/dynamic-form.tsx`: `key={`${field.name}-${index}`}`.
+- **Database / config impact:** none
+- **Tests:** `cd web && npx jest src/pages/user-setting/data-source/__tests__/confluence-form-fields.test.tsx`. Without the fix it fails on the duplicate-key warning; with the fix it passes. No new failures in the suites that render `DynamicForm`. The 6 type errors in `dynamic-form.tsx` and three dataset suites that fail are pre-existing on `main`.
+- **Upstream merge notes:** if upstream fixes this itself (de-duplicating the Confluence config or changing the key), drop this change and keep whichever fix upstream chose.
+- **Commits:** `git log --grep "CUST-004"`
+
 ### [CUST-003] Global model providers — 2026-11-19
 
 - **Type:** feature, security
