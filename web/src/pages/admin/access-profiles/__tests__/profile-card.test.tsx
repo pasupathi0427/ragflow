@@ -3,6 +3,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProfileCard } from '../profile-card';
 
+jest.mock('../../global-models/hooks', () => ({
+  useFetchGlobalProviders: () => ({ data: [], loading: false }),
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
@@ -17,6 +21,7 @@ const Profile = {
   features: { [AccessFeature.Mcp]: false },
   is_default: false,
   member_count: 2,
+  global_models: { all: true, model_ids: [] },
 };
 
 function renderCard(expanded: boolean, onExpandedChange = jest.fn()) {
@@ -28,6 +33,7 @@ function renderCard(expanded: boolean, onExpandedChange = jest.fn()) {
         expanded={expanded}
         onExpandedChange={onExpandedChange}
         onFeatureChange={jest.fn()}
+        onGlobalModelsChange={jest.fn()}
         onEdit={jest.fn()}
         onDelete={jest.fn()}
       />
@@ -52,7 +58,8 @@ describe('ProfileCard', () => {
 
   it('shows the switches when expanded', () => {
     renderCard(true);
-    expect(screen.getAllByRole('switch')).toHaveLength(6);
+    // Six feature switches plus the all-global-models switch.
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
   });
 
   it('asks to expand when the header is clicked', () => {

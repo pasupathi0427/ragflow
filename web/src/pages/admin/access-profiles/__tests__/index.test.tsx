@@ -2,6 +2,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { fireEvent, render, screen } from '@testing-library/react';
 import AdminAccessProfiles from '../index';
 
+jest.mock('../../global-models/hooks', () => ({
+  useFetchGlobalProviders: () => ({ data: [], loading: false }),
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -31,6 +35,7 @@ jest.mock('../hooks', () => ({
         features: {},
         is_default: true,
         member_count: 0,
+        global_models: { all: true, model_ids: [] },
       },
       {
         id: 'p1',
@@ -39,6 +44,7 @@ jest.mock('../hooks', () => ({
         features: { mcp: false },
         is_default: false,
         member_count: 2,
+        global_models: { all: true, model_ids: [] },
       },
     ],
     loading: false,
@@ -92,7 +98,8 @@ describe('AdminAccessProfiles', () => {
     renderPage();
 
     fireEvent.click(screen.getByText('accessProfile.expandAll'));
-    expect(screen.getAllByRole('switch')).toHaveLength(12);
+    // Seven switches per profile: six features plus all-global-models.
+    expect(screen.getAllByRole('switch')).toHaveLength(14);
 
     fireEvent.click(screen.getByText('accessProfile.collapseAll'));
     expect(screen.queryAllByRole('switch')).toHaveLength(0);

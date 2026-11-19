@@ -5,6 +5,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import {
+  LucideBoxes,
   LucideMonitor,
   LucideServerCrash,
   LucideShieldCheck,
@@ -59,6 +60,11 @@ const AdminNavigationLayout = () => {
         path: Routes.AdminAccessProfiles,
         name: t('accessProfile.title'),
         icon: <LucideShieldCheck className="size-[1em]" />,
+      },
+      {
+        path: Routes.AdminGlobalModels,
+        name: t('globalModel.title'),
+        icon: <LucideBoxes className="size-[1em]" />,
       },
       ...(IS_ENTERPRISE
         ? [

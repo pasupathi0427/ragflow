@@ -9,6 +9,7 @@ const Profiles = [
     features: {},
     is_default: true,
     member_count: 0,
+    global_models: { all: true, model_ids: [] },
   },
   {
     id: 'p1',
@@ -17,6 +18,7 @@ const Profiles = [
     features: {},
     is_default: false,
     member_count: 3,
+    global_models: { all: true, model_ids: [] },
   },
 ];
 

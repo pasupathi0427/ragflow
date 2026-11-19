@@ -543,6 +543,26 @@ const apiEndpoints = {
     `${restAPIv1}/admin/users/${username}/access-profile`,
   myAccessFeatures: `${restAPIv1}/users/me/features`,
 
+  // Global model providers
+  adminGlobalModels: `${restAPIv1}/admin/global-models`,
+  adminGlobalModelCatalog: `${restAPIv1}/admin/global-models/catalog`,
+  adminGlobalProviders: `${restAPIv1}/admin/global-models/providers`,
+  adminGlobalProvider: (providerId: string) =>
+    `${restAPIv1}/admin/global-models/providers/${providerId}`,
+  adminGlobalProviderInstances: (providerId: string) =>
+    `${restAPIv1}/admin/global-models/providers/${providerId}/instances`,
+  adminGlobalProviderConnection: (providerId: string) =>
+    `${restAPIv1}/admin/global-models/providers/${providerId}/connection`,
+  adminGlobalInstance: (instanceId: string) =>
+    `${restAPIv1}/admin/global-models/instances/${instanceId}`,
+  adminGlobalInstanceModels: (instanceId: string) =>
+    `${restAPIv1}/admin/global-models/instances/${instanceId}/models`,
+  adminGlobalModel: (modelId: string) =>
+    `${restAPIv1}/admin/global-models/models/${modelId}`,
+  adminGlobalModelStatus: (modelId: string) =>
+    `${restAPIv1}/admin/global-models/models/${modelId}/status`,
+  adminGlobalModelDefaults: `${restAPIv1}/admin/global-models/defaults`,
+
   // Skill spaces
   skillSpaces: `${restAPIv1}/skills/spaces`,
   skillSpace: (spaceId: string) => `${restAPIv1}/skills/spaces/${spaceId}`,

@@ -19,7 +19,17 @@ import type {
   IAccessProfile,
   IAccessProfileAssignment,
 } from '@/interfaces/database/access-profile';
+import type {
+  GlobalModelDefaults,
+  IGlobalCatalogProvider,
+  IGlobalProvider,
+} from '@/interfaces/database/global-model';
 import type { IAccessProfileRequestBody } from '@/interfaces/request/access-profile';
+import type {
+  IGlobalConnectionRequestBody,
+  IGlobalInstanceRequestBody,
+  IGlobalModelInput,
+} from '@/interfaces/request/global-model';
 import axios from 'axios';
 
 import message from '@/components/ui/message';
@@ -376,4 +386,80 @@ export const assignAccessProfile = (email: string, profileId: string) =>
   request.put<ResponseData<IAccessProfileAssignment>>(
     api.adminAssignAccessProfile(encodeURIComponent(email)),
     { profile_id: profileId },
+  );
+
+const encode = encodeURIComponent;
+
+export const listGlobalModels = () =>
+  request.get<ResponseData<IGlobalProvider[]>>(api.adminGlobalModels);
+
+export const listGlobalModelCatalog = () =>
+  request.get<ResponseData<IGlobalCatalogProvider[]>>(
+    api.adminGlobalModelCatalog,
+  );
+
+export const addGlobalProvider = (providerName: string) =>
+  request.post<ResponseData<{ id: string; provider_name: string }>>(
+    api.adminGlobalProviders,
+    { provider_name: providerName },
+  );
+
+export const deleteGlobalProvider = (providerId: string) =>
+  request.delete<ResponseData<void>>(
+    api.adminGlobalProvider(encode(providerId)),
+  );
+
+export const createGlobalInstance = (
+  providerId: string,
+  body: IGlobalInstanceRequestBody,
+) =>
+  request.post<ResponseData<{ id: string; instance_name: string }>>(
+    api.adminGlobalProviderInstances(encode(providerId)),
+    body,
+  );
+
+export const testGlobalConnection = (
+  providerId: string,
+  body: IGlobalConnectionRequestBody,
+) =>
+  request.post<ResponseData<void>>(
+    api.adminGlobalProviderConnection(encode(providerId)),
+    body,
+  );
+
+export const updateGlobalInstance = (
+  instanceId: string,
+  body: IGlobalInstanceRequestBody,
+) =>
+  request.put<ResponseData<void>>(
+    api.adminGlobalInstance(encode(instanceId)),
+    body,
+  );
+
+export const deleteGlobalInstance = (instanceId: string) =>
+  request.delete<ResponseData<void>>(
+    api.adminGlobalInstance(encode(instanceId)),
+  );
+
+export const addGlobalModel = (instanceId: string, body: IGlobalModelInput) =>
+  request.post<ResponseData<void>>(
+    api.adminGlobalInstanceModels(encode(instanceId)),
+    body,
+  );
+
+export const setGlobalModelStatus = (modelId: string, status: string) =>
+  request.put<ResponseData<void>>(api.adminGlobalModelStatus(encode(modelId)), {
+    status,
+  });
+
+export const deleteGlobalModel = (modelId: string) =>
+  request.delete<ResponseData<void>>(api.adminGlobalModel(encode(modelId)));
+
+export const getGlobalModelDefaults = () =>
+  request.get<ResponseData<GlobalModelDefaults>>(api.adminGlobalModelDefaults);
+
+export const setGlobalModelDefaults = (defaults: GlobalModelDefaults) =>
+  request.put<ResponseData<GlobalModelDefaults>>(
+    api.adminGlobalModelDefaults,
+    defaults,
   );

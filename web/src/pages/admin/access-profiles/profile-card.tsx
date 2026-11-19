@@ -8,13 +8,22 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { AccessFeature, AccessFeatures } from '@/constants/access-profile';
-import { IAccessProfile } from '@/interfaces/database/access-profile';
+import {
+  IAccessProfile,
+  IGlobalModelAccess,
+} from '@/interfaces/database/access-profile';
 import { cn } from '@/lib/utils';
 import { LucideChevronRight, LucideEdit3, LucideTrash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FeatureSwitchList } from './feature-switch-list';
+import { GlobalModelAccessEditor } from './global-model-access';
 import { getDisabledFeatures } from './utils';
+
+const DefaultGlobalModelAccess: IGlobalModelAccess = {
+  all: true,
+  model_ids: [],
+};
 
 export function ProfileCard({
   profile,
@@ -22,6 +31,7 @@ export function ProfileCard({
   expanded,
   onExpandedChange,
   onFeatureChange,
+  onGlobalModelsChange,
   onEdit,
   onDelete,
 }: {
@@ -33,6 +43,10 @@ export function ProfileCard({
     profile: IAccessProfile,
     feature: AccessFeature,
     enabled: boolean,
+  ) => void;
+  onGlobalModelsChange: (
+    profile: IAccessProfile,
+    access: IGlobalModelAccess,
   ) => void;
   onEdit: (profile: IAccessProfile) => void;
   onDelete: (profile: IAccessProfile) => void;
@@ -47,6 +61,10 @@ export function ProfileCard({
     (feature: AccessFeature, enabled: boolean) =>
       onFeatureChange(profile, feature, enabled),
     [onFeatureChange, profile],
+  );
+  const handleGlobalModelsChange = useCallback(
+    (access: IGlobalModelAccess) => onGlobalModelsChange(profile, access),
+    [onGlobalModelsChange, profile],
   );
   const handleEdit = useCallback(() => onEdit(profile), [onEdit, profile]);
   const handleDelete = useCallback(
@@ -143,11 +161,16 @@ export function ProfileCard({
         </CardHeader>
 
         <CollapsibleContent>
-          <CardContent className="p-6">
+          <CardContent className="space-y-4 p-6">
             <FeatureSwitchList
               features={profile.features}
               disabled={saving}
               onFeatureChange={handleFeatureChange}
+            />
+            <GlobalModelAccessEditor
+              access={profile.global_models ?? DefaultGlobalModelAccess}
+              disabled={saving}
+              onChange={handleGlobalModelsChange}
             />
           </CardContent>
         </CollapsibleContent>

@@ -96,6 +96,8 @@ export interface IAddedModel {
   tenant_name?: string;
   user_id?: string;
   nickname?: string;
+  /** Provided by the organization's admin to every user; read-only. */
+  is_global?: boolean;
 }
 
 export interface IInstanceModel {

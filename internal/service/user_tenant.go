@@ -24,6 +24,7 @@ import (
 	"ragflow/internal/common"
 	"ragflow/internal/dao"
 	"ragflow/internal/entity"
+	"ragflow/internal/globalmodel"
 	"ragflow/internal/permission"
 )
 
@@ -367,15 +368,19 @@ func (s *UserTenantService) ListDefaultModels(ctx context.Context) ([]ModelItem,
 	factory := NewModelFactory()
 	result := make([]ModelItem, 0, len(models))
 	for _, model := range models {
+		_, _, modelType, err := defaultModelFields(model.modelType)
+		if err != nil {
+			continue
+		}
 		modelRef := ptrStringValue(model.modelID)
 		if modelRef == "" {
 			modelRef = model.modelName
 		}
 		if strings.TrimSpace(modelRef) == "" {
-			continue
+			// No default of the user's own: show the admin's global default.
+			modelRef = globalmodel.DefaultModelID(ctx, dao.DB, modelType)
 		}
-		_, _, modelType, err := defaultModelFields(model.modelType)
-		if err != nil {
+		if strings.TrimSpace(modelRef) == "" {
 			continue
 		}
 		info, err := factory.ResolveInfo(permission.WithTenantID(ctx, tenantID), modelType, modelRef)

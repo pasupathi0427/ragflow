@@ -1720,6 +1720,10 @@ func (h *ProviderHandler) ListModelsForUserInTenant(c *gin.Context) {
 		common.RespondError(c, code, err.Error())
 		return
 	}
+	if models, err = h.modelProviderService.AppendGlobalModels(ctx, models, modelType); err != nil {
+		common.RespondError(c, common.CodeServerError, err.Error())
+		return
+	}
 
 	common.RespondSuccessList(c, models, "success")
 }

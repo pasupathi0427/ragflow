@@ -13,7 +13,10 @@ import {
   useFetchAccessProfiles,
   useUpdateAccessProfile,
 } from './hooks';
-import { IAccessProfile } from '@/interfaces/database/access-profile';
+import {
+  IAccessProfile,
+  IGlobalModelAccess,
+} from '@/interfaces/database/access-profile';
 import { IAccessProfileRequestBody } from '@/interfaces/request/access-profile';
 import {
   LucideChevronsDownUp,
@@ -134,6 +137,22 @@ function AdminAccessProfiles() {
     [updateAccessProfile],
   );
 
+  const handleGlobalModelsChange = useCallback(
+    (profile: IAccessProfile, access: IGlobalModelAccess) =>
+      updateAccessProfile({
+        profileId: profile.id,
+        body: {
+          name: profile.name,
+          description: profile.description,
+          features: profile.features,
+          global_models: access,
+        },
+      }).catch(() => {
+        // The admin request client already shows the error.
+      }),
+    [updateAccessProfile],
+  );
+
   const handleDeleteOpenChange = useCallback((open: boolean) => {
     if (!open) {
       setDeletingProfile(undefined);
@@ -214,6 +233,7 @@ function AdminAccessProfiles() {
                   expanded={expandedIds.has(profile.id)}
                   onExpandedChange={handleExpandedChange}
                   onFeatureChange={handleFeatureChange}
+                  onGlobalModelsChange={handleGlobalModelsChange}
                   onEdit={openEditDialog}
                   onDelete={setDeletingProfile}
                 />

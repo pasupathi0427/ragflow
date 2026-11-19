@@ -370,3 +370,55 @@ func TestGlobalDefaultMustBeEnabled(t *testing.T) {
 		t.Fatalf("disabled model accepted as default: %v", err)
 	}
 }
+
+func TestAppendGlobalModelsListsWhatTheUserMayCall(t *testing.T) {
+	db := setupGlobalModelTest(t)
+	if err := db.Create(&entity.TenantModel{ID: "global-embed", ProviderID: testGlobalProviderID, InstanceID: testGlobalInstanceID, ModelName: "bge", ModelType: int(entity.ModelTypeEmbedding), Status: "active"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	ctx := serviceTestContext(t, "user-1", "user-1")
+	providers := NewModelProviderService()
+
+	listed, err := providers.AppendGlobalModels(ctx, nil, "")
+	if err != nil || len(listed) != 2 {
+		t.Fatalf("all types: %d models (%v)", len(listed), err)
+	}
+	for _, model := range listed {
+		if model["is_global"] != true || model["tenant_id"] != entity.GlobalModelOwnerID {
+			t.Fatalf("global model not marked: %v", model)
+		}
+		for _, field := range []string{"api_key", "base_url", "extra"} {
+			if _, ok := model[field]; ok {
+				t.Fatalf("listing exposes %s: %v", field, model)
+			}
+		}
+	}
+
+	chatOnly, err := providers.AppendGlobalModels(ctx, nil, "chat")
+	if err != nil || len(chatOnly) != 1 || chatOnly[0]["name"] != "qwen" {
+		t.Fatalf("chat filter: %v (%v)", chatOnly, err)
+	}
+
+	if err := db.Model(&entity.TenantModel{}).Where("id = ?", "global-embed").Update("status", "inactive").Error; err != nil {
+		t.Fatal(err)
+	}
+	restrictUserToGlobalModels(t)
+	hidden, err := providers.AppendGlobalModels(ctx, []map[string]interface{}{{"model_id": "own"}}, "")
+	if err != nil || len(hidden) != 1 || hidden[0]["model_id"] != "own" {
+		t.Fatalf("disabled and disallowed models listed: %v (%v)", hidden, err)
+	}
+}
+
+func TestDefaultModelListFallsBackToGlobalDefault(t *testing.T) {
+	setupGlobalModelTest(t)
+	if _, err := NewGlobalModelAdminService().SetDefaults(context.Background(), map[string]string{"chat": testGlobalModelID}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := NewUserTenantService().ListDefaultModels(serviceTestContext(t, "user-1", "user-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ModelID != testGlobalModelID || items[0].ModelType != "chat" {
+		t.Fatalf("defaults = %+v, want the global chat default", items)
+	}
+}

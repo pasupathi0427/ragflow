@@ -29,6 +29,7 @@ import { ProviderInstanceCard } from './instance-card/provider-instance-card';
 import { ProviderHeaderBar } from './layout/provider-header-bar';
 import { Sidebar, SidebarSelection } from './layout/sidebar';
 import SystemSetting from './layout/system-setting';
+import { OrganizationModels } from './organization-models';
 
 /**
  * Sidebar-driven model provider settings page.
@@ -164,6 +165,7 @@ const SettingModelV2: FC = () => {
         {selection === 'default' ? (
           <div className="flex-1 overflow-auto scrollbar-auto">
             <SystemSetting />
+            <OrganizationModels />
           </div>
         ) : (
           <>

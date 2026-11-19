@@ -18,6 +18,8 @@ package admin
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 
 	"ragflow/internal/common"
 	"ragflow/internal/service"
@@ -64,7 +66,7 @@ func respondGlobalModelError(c *gin.Context, err error, usage *service.GlobalMod
 	case errors.Is(err, service.ErrGlobalModelConflict):
 		common.RespondError(c, common.CodeConflict, err.Error())
 	case errors.Is(err, service.ErrGlobalModelInUse):
-		common.Respond(c, 0, common.CodeConflict, usage, err.Error())
+		common.Respond(c, 0, common.CodeConflict, usage, describeGlobalModelUsage(usage))
 	default:
 		common.Error("global model admin request failed", err)
 		common.RespondError(c, common.CodeServerError, "")
@@ -262,4 +264,36 @@ func (h *globalModelsHandler) setDefaults(c *gin.Context) {
 	}
 	auditGlobalModelChange(c, "set_defaults", zap.Any("defaults", stored))
 	common.RespondSuccess(c, stored, "")
+}
+
+// describeGlobalModelUsage says what blocks a delete, e.g. "Still in use by 2
+// datasets and 1 chat. Disable it instead, or move them to another model first."
+func describeGlobalModelUsage(usage *service.GlobalModelUsage) string {
+	if usage == nil {
+		return service.ErrGlobalModelInUse.Error()
+	}
+	parts := []string{}
+	add := func(count int64, singular, plural string) {
+		switch {
+		case count == 1:
+			parts = append(parts, "1 "+singular)
+		case count > 1:
+			parts = append(parts, fmt.Sprintf("%d %s", count, plural))
+		}
+	}
+	add(usage.Datasets, "dataset", "datasets")
+	add(usage.Chats, "chat", "chats")
+	add(usage.Memories, "memory", "memories")
+	add(usage.Agents, "agent", "agents")
+	add(usage.Searches, "search app", "search apps")
+	add(usage.SkillConfigs, "skill configuration", "skill configurations")
+	add(usage.UserDefaults, "user default", "user defaults")
+	if len(usage.GlobalDefault) > 0 {
+		parts = append(parts, "the global default for "+strings.Join(usage.GlobalDefault, ", "))
+	}
+	used := strings.Join(parts, ", ")
+	if i := strings.LastIndex(used, ", "); i >= 0 {
+		used = used[:i] + " and " + used[i+2:]
+	}
+	return "Still in use by " + used + ". Disable it instead, or move them to another model first."
 }

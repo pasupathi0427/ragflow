@@ -15,7 +15,9 @@
  */
 
 import LLMLabel, { MissingModelLabel } from '@/components/llm-select/llm-label';
+import { GlobalModelBadge } from '@/components/global-model-badge';
 import { LlmIcon } from '@/components/svg-icon';
+import i18n from '@/locales/config';
 import { ModelSharingBadge } from '@/ee/components/model-sharing-badge';
 import {
   FormControl,
@@ -52,6 +54,9 @@ export const ModelTypeMap: Record<string, string[]> = {
   tts_id: ['tts'],
 };
 
+// Prefix of a provider group holding global models.
+const GlobalProviderKeyPrefix = 'global::';
+
 /** The type/provider predicate shared by buildModelTree and useModelTree. */
 function filterAddedModels(
   allModels: IAddedModel[],
@@ -87,12 +92,17 @@ export function buildModelTree(
   );
 
   const seenLeafIds = new Set<string>();
+  // Global models get their own provider group so they never merge with a
+  // user's own provider of the same name.
   const providerMap = new Map<string, Map<string, IAddedModel[]>>();
   for (const model of filtered) {
-    let instances = providerMap.get(model.provider_name);
+    const providerKey = model.is_global
+      ? `${GlobalProviderKeyPrefix}${model.provider_name}`
+      : model.provider_name;
+    let instances = providerMap.get(providerKey);
     if (!instances) {
       instances = new Map();
-      providerMap.set(model.provider_name, instances);
+      providerMap.set(providerKey, instances);
     }
     let modelList = instances.get(model.instance_name);
     if (!modelList) {
@@ -104,7 +114,9 @@ export function buildModelTree(
 
   return Array.from(providerMap.entries()).map(([provider, instances]) => ({
     id: provider,
-    title: provider,
+    title: provider.startsWith(GlobalProviderKeyPrefix)
+      ? `${provider.slice(GlobalProviderKeyPrefix.length)} (${i18n.t('globalModel.badge')})`
+      : provider,
     children: Array.from(instances.entries()).map(([instance, models]) => ({
       id: `${provider}||${instance}`,
       title: instance,
@@ -133,6 +145,7 @@ export function buildModelTree(
                 imgClass="size-[22px] flex-shrink-0"
               />
               <span className="truncate">{modelName}</span>
+              {m.is_global && <GlobalModelBadge />}
               <ModelSharingBadge
                 tenantName={m.tenant_name}
                 tenantId={mTenantId}

@@ -39,7 +39,7 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 - **Type:** feature, security
 - **Jira:** sub-task of AI-145 "RAG Platform (RAGFlow) customization"
 - **Requirement:** A super admin configures model providers, keys and models once, and every user can call them without their own setup. Users can still add their own providers. Global models are read-only for users: they can be used but never edited, disabled, deleted, re-keyed or read. Access profiles decide which global models a user may call.
-- **Status:** A1 backend done. Still to do: A2 admin UI (Global models page) and A3 user side (global models in model lists, Global badge, per-profile model access in the profile card).
+- **Status:** A1 backend, A2 admin UI and A3 user side are done.
 - **Change (A1):**
   - **Storage.** Global providers, instances and models live in the regular `tenant_model_provider`, `tenant_model_instance` and `tenant_model` tables, owned by the reserved tenant and user ID `global` (`entity.GlobalModelOwnerID`). Upstream's catalog and provider handling, and references by model ID, work unchanged. Every provider a user can configure can also be configured globally.
   - **One use rule.** `internal/globalmodel` provides `ProviderByName` (the tenant's own provider first, then global), `OwnedOrGlobalProviderIDs`, and `CheckUse`.
@@ -56,7 +56,22 @@ Before merging or rebasing onto upstream, read this file to see which files carr
   - **Global defaults.** The admin sets a default model per type (chat, embedding, speech2text, image2text, rerank, tts, ocr, decision) in `system_settings` (`global_models.defaults`). A user with no default of that type gets the global one, applied at lookup time with no copying. A user's own default still wins.
   - **Access profiles.** New `global_models` setting (`{"all": true}` by default, or a list of global model IDs). It's returned in `/users/me/features`, and an update that omits it keeps the current value.
   - **Admin API** (superuser only, admin console): `/api/v1/admin/global-models` — list, catalog, providers, instances (create, update key/endpoint/status, delete, test connection), models (add, enable/disable, delete), and defaults. Deletes are refused, with counts, while a dataset, chat, memory, agent, user default or global default uses the model. Every change is audit-logged without keys.
-- **Files (new):** `internal/globalmodel/{globalmodel,defaults}.go` + test, `internal/common/model_api_key.go` + test, `internal/entity/global_model.go`, `internal/accessprofile/global_models.go`, `internal/service/global_model_admin.go`, `internal/service/global_model_test.go`, `internal/admin/global_models_handler.go`, `internal/ingestion/component/global_model_test.go`, `internal/agent/component/global_model_test.go`
+- **Change (A2 admin UI):**
+  - New admin console page **Global models** (`/admin/global-models`, `web/src/pages/admin/global-models/`):
+    - add a catalog provider;
+    - add instances (base URL, optional API key and region, models with types and max tokens) with **Test connection**;
+    - enable or disable an instance or a model (the hard stop);
+    - add or delete models, delete instances and providers (refused with the reason while in use);
+    - set global defaults per type.
+  - Default keys are sent as `asr` / `vision` because the admin request client snake-cases top-level keys.
+  - Each access-profile card gets a **Global models** section (all, or a checked allow list).
+- **Change (A3 user side):**
+  - `GET /api/v1/models` appends the global models the caller may use (`service/global_model_list.go`, called from `handler/providers.go`), marked `is_global`, with no key or endpoint.
+  - `GET /api/v1/models/default` falls back to the global default (`service/user_tenant.go`).
+  - In the frontend, every model dropdown shows global models in their own provider group with a **Global** badge (`components/model-tree-select.tsx`, `components/global-model-badge.tsx`).
+  - The Model providers page's default view lists them read-only under "Provided by your organization" (`pages/user-setting/setting-model/organization-models.tsx`).
+  - Users cannot edit them anywhere.
+- **Files (new):** `internal/globalmodel/{globalmodel,defaults,endpoint}.go` + test, `internal/service/global_model_list.go`, `web/src/pages/admin/global-models/*` (page, hooks, constants, provider card, instance and add-provider dialogs, defaults card, tests), `web/src/pages/admin/access-profiles/global-model-access.tsx` + test, `web/src/components/global-model-badge.tsx`, `web/src/components/__tests__/model-tree-select-global.test.tsx`, `web/src/pages/user-setting/setting-model/organization-models.tsx` + test, `web/src/interfaces/{database,request}/global-model.ts`, `internal/common/model_api_key.go` + test, `internal/entity/global_model.go`, `internal/accessprofile/global_models.go`, `internal/service/global_model_admin.go`, `internal/service/global_model_test.go`, `internal/admin/global_models_handler.go`, `internal/ingestion/component/global_model_test.go`, `internal/agent/component/global_model_test.go`
 - **Files (upstream, edited — check these first after an upstream merge):**
   - `internal/service/model_factory.go`: provider by name through `globalmodel.ProviderByName`; global branch before the tenant check; non-owner checks skipped for global; global default fallback in `defaultModelReference`.
   - `internal/agent/component/llm_credentials.go`: 4 lookups (see above).
@@ -64,6 +79,14 @@ Before merging or rebasing onto upstream, read this file to see which files carr
   - `internal/ingestion/component/dispatch_model_test.go`: the scoped-SQL test expects the owned-or-global scope (still fully parameter-bound).
   - `internal/ingestion/component/pdf_parser_model.go`, `internal/agentic_rag/decision_config.go`: global exception + `CheckUse`.
   - `internal/admin/router.go`: `RegisterGlobalModelRoutes(protected)`.
+  - `internal/handler/providers.go`: `AppendGlobalModels` after the user's own models in `ListModelsForUserInTenant`.
+  - `internal/service/user_tenant.go`: global default fallback in `ListDefaultModels`.
+  - `web/src/components/model-tree-select.tsx`: global provider group + Global badge.
+  - `web/src/interfaces/database/llm.ts`: `is_global` on `IAddedModel`.
+  - `web/src/pages/user-setting/setting-model/index.tsx`: `<OrganizationModels />` under the default models view.
+  - `web/src/routes.tsx`, `web/src/pages/admin/layouts/navigation-layout.tsx`: Global models route and nav item.
+  - `web/src/utils/api.ts`, `web/src/services/admin-service.ts`: global model endpoints and calls.
+  - `web/src/locales/{en,zh}.ts`: `globalModel` section and access-profile strings.
   - Own files from CUST-001: `internal/entity/access_profile.go` (`global_models` column), `internal/dao/access_profile.go`, `internal/accessprofile/service.go`, `internal/admin/access_profile_routes_test.go` (now covers the global-model routes too).
 - **Database / config impact:**
   - New column `access_profile.global_models` (AutoMigrate).

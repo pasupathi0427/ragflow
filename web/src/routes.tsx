@@ -86,6 +86,7 @@ export enum Routes {
   AdminUserManagement = `${Admin}/users`,
   AdminSandboxSettings = `${Admin}/sandbox-settings`,
   AdminAccessProfiles = `${Admin}/access-profiles`,
+  AdminGlobalModels = `${Admin}/global-models`,
   AdminWhitelist = `${Admin}/whitelist`,
   AdminRoles = `${Admin}/roles`,
   AdminMonitoring = `${Admin}/monitoring`,
@@ -465,6 +466,10 @@ const routeConfigOptions = [
               {
                 path: Routes.AdminAccessProfiles,
                 Component: () => import('@/pages/admin/access-profiles'),
+              },
+              {
+                path: Routes.AdminGlobalModels,
+                Component: () => import('@/pages/admin/global-models'),
               },
               ...(IS_ENTERPRISE
                 ? [

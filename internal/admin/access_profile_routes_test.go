@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"ragflow/internal/common"
+	"ragflow/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -67,5 +68,13 @@ func TestCustomAdminRoutesRequireAdminAuth(t *testing.T) {
 				t.Fatalf("route reachable without admin token: %s", recorder.Body.String())
 			}
 		})
+	}
+}
+
+func TestDescribeGlobalModelUsage(t *testing.T) {
+	got := describeGlobalModelUsage(&service.GlobalModelUsage{Datasets: 2, Chats: 1, GlobalDefault: []string{"chat"}})
+	want := "Still in use by 2 datasets, 1 chat and the global default for chat. Disable it instead, or move them to another model first."
+	if got != want {
+		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }
