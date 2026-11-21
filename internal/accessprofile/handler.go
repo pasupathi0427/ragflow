@@ -88,13 +88,17 @@ func RegisterAdminRoutes(protected *gin.RouterGroup) {
 	protected.DELETE("/access-profiles/:profile_id", h.Delete)
 	protected.GET("/access-profile-assignments", h.ListAssignments)
 	protected.PUT("/users/:username/access-profile", h.AssignUser)
+	protected.GET("/users/:username/api-keys", h.ListAPIKeys)
+	protected.POST("/users/:username/api-keys", h.CreateAPIKey)
+	protected.PUT("/users/:username/api-keys/:key_id", h.SetAPIKeyEnabled)
+	protected.DELETE("/users/:username/api-keys/:key_id", h.DeleteAPIKey)
 }
 
 func respondServiceError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrInvalidInput):
 		common.RespondError(c, common.CodeBadRequest, err.Error())
-	case errors.Is(err, ErrProfileNotFound), errors.Is(err, ErrUserNotFound):
+	case errors.Is(err, ErrProfileNotFound), errors.Is(err, ErrUserNotFound), errors.Is(err, ErrAPIKeyNotFound):
 		common.RespondError(c, common.CodeNotFound, err.Error())
 	case errors.Is(err, ErrProfileNameTaken):
 		common.RespondError(c, common.CodeConflict, err.Error())
@@ -220,4 +224,82 @@ func (h *AdminHandler) AssignUser(c *gin.Context) {
 	}
 	auditAdminChange(c, "assign", zap.String("user_id", assignment.UserID), zap.String("profile_id", assignment.ProfileID))
 	common.RespondSuccess(c, assignment, "")
+}
+
+// ListAPIKeys returns the keys the admin manages for a user.
+func (h *AdminHandler) ListAPIKeys(c *gin.Context) {
+	keys, err := h.service.ListAPIKeys(c.Request.Context(), c.Param("username"))
+	if err != nil {
+		respondServiceError(c, err)
+		return
+	}
+	common.RespondSuccessList(c, keys, "", int64(len(keys)))
+}
+
+type createAPIKeyRequest struct {
+	Name string `json:"name"`
+}
+
+// CreateAPIKey creates a key for a user. The full key is returned only in this
+// response.
+func (h *AdminHandler) CreateAPIKey(c *gin.Context) {
+	common.StartOperationLog(c, "create_admin_api_key")
+	defer common.FinishOperationLog(c)
+
+	username := c.Param("username")
+	common.SetOperationResource(c, "target_username", username)
+	var req createAPIKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.RespondError(c, common.CodeBadRequest, "Invalid request body")
+		return
+	}
+	key, err := h.service.CreateAPIKey(c.Request.Context(), username, req.Name, c.GetString("email"))
+	if err != nil {
+		respondServiceError(c, err)
+		return
+	}
+	auditAdminChange(c, "create_api_key", zap.String("target_username", username), zap.String("key_id", key.ID))
+	common.RespondSuccess(c, key, "")
+}
+
+type setAPIKeyEnabledRequest struct {
+	Enabled *bool `json:"enabled"`
+}
+
+// SetAPIKeyEnabled switches a user's admin-managed key on or off.
+func (h *AdminHandler) SetAPIKeyEnabled(c *gin.Context) {
+	common.StartOperationLog(c, "update_admin_api_key")
+	defer common.FinishOperationLog(c)
+
+	username := c.Param("username")
+	keyID := c.Param("key_id")
+	common.SetOperationResource(c, "target_username", username)
+	var req setAPIKeyEnabledRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil {
+		common.RespondError(c, common.CodeBadRequest, "enabled is required")
+		return
+	}
+	key, err := h.service.SetAPIKeyEnabled(c.Request.Context(), username, keyID, *req.Enabled)
+	if err != nil {
+		respondServiceError(c, err)
+		return
+	}
+	auditAdminChange(c, "set_api_key_enabled", zap.String("target_username", username), zap.String("key_id", keyID), zap.Bool("enabled", *req.Enabled))
+	common.RespondSuccess(c, key, "")
+}
+
+// DeleteAPIKey removes a user's admin-managed key.
+func (h *AdminHandler) DeleteAPIKey(c *gin.Context) {
+	common.StartOperationLog(c, "delete_admin_api_key")
+	defer common.FinishOperationLog(c)
+
+	username := c.Param("username")
+	keyID := c.Param("key_id")
+	common.SetOperationResource(c, "target_username", username)
+	if err := h.service.DeleteAPIKey(c.Request.Context(), username, keyID); err != nil {
+		respondServiceError(c, err)
+		return
+	}
+	auditAdminChange(c, "delete_api_key", zap.String("target_username", username), zap.String("key_id", keyID))
+	common.RespondSuccess(c, nil, "")
 }

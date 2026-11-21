@@ -24,6 +24,18 @@ export interface IAccessProfile {
   member_count: number;
 }
 
+/** A key the super admin manages for a user. `token` is set only right after
+ * the key is created; the list returns `masked_token` only. */
+export interface IAdminAPIKey {
+  id: string;
+  name: string;
+  masked_token: string;
+  token?: string;
+  enabled: boolean;
+  created_by: string;
+  create_time?: number;
+}
+
 export interface IAccessProfileAssignment {
   user_id: string;
   email: string;

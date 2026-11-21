@@ -97,6 +97,10 @@ func (h *SystemHandler) DeleteKey(c *gin.Context) {
 
 	// Delete key
 	if err = h.systemService.DeleteAPIKey(ctx, key); err != nil {
+		if errors.Is(err, service.ErrAPIKeyManagedByAdmin) {
+			common.Respond(c, http.StatusForbidden, common.CodeForbidden, nil, "This API key is managed by your administrator.")
+			return
+		}
 		common.Respond(c, http.StatusInternalServerError, 500, nil, "Failed to delete key: "+err.Error())
 		return
 	}

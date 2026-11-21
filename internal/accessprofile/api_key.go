@@ -21,6 +21,8 @@ import (
 	"errors"
 
 	"ragflow/internal/common"
+	"ragflow/internal/dao"
+	"ragflow/internal/entity"
 
 	"go.uber.org/zap"
 )
@@ -28,20 +30,34 @@ import (
 // Errors returned by CheckAPIKeyAccess.
 var (
 	ErrAPIAccessDisabled    = errors.New("API access is disabled for this account. Contact your administrator.")
+	ErrAPIAccountDisabled   = errors.New("This account has been disabled. Contact your administrator.")
+	ErrAPIKeyDisabled       = errors.New("This API key is disabled. Contact your administrator.")
 	ErrAPIAccessCheckFailed = errors.New("API access check failed")
 )
 
 // CheckAPIKeyAccess rejects a request authenticated with an API key when the
-// key owner's profile turns API access off. Embed (beta) tokens are not API
-// keys and are not checked.
-func CheckAPIKeyAccess(ctx context.Context, userID string) error {
-	enabled, err := DefaultService().IsEnabled(ctx, userID, FeatureAPI)
+// key owner is inactive, when the owner's profile turns API access off, or when
+// the key is one a super admin manages and has switched off. Embed (beta)
+// tokens are not API keys and are not checked.
+func CheckAPIKeyAccess(ctx context.Context, user *entity.User, token string) error {
+	if user.IsActive != "1" {
+		return ErrAPIAccountDisabled
+	}
+	enabled, err := DefaultService().IsEnabled(ctx, user.ID, FeatureAPI)
 	if err != nil {
-		common.Error("access profile lookup failed", err, zap.String("user_id", userID))
+		common.Error("access profile lookup failed", err, zap.String("user_id", user.ID))
 		return ErrAPIAccessCheckFailed
 	}
 	if !enabled {
 		return ErrAPIAccessDisabled
+	}
+	adminKey, err := dao.NewAdminAPIKeyDAO().GetByToken(ctx, dao.DB, token)
+	if err != nil {
+		common.Error("admin API key lookup failed", err, zap.String("user_id", user.ID))
+		return ErrAPIAccessCheckFailed
+	}
+	if adminKey != nil && adminKey.Enabled != "1" {
+		return ErrAPIKeyDisabled
 	}
 	return nil
 }

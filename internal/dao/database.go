@@ -300,6 +300,7 @@ func autoMigrateModels() []interface{} {
 		&entity.CompilationTemplateGroup{},
 		&entity.AccessProfile{},
 		&entity.UserAccessProfile{},
+		&entity.AdminAPIKey{},
 	}
 	dataModels = append(dataModels, permissionDataModelsEE()...)
 	dataModels = append(dataModels, billingDataModelsEE()...)

@@ -34,6 +34,41 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-006] Admin-managed API keys for users — 2026-11-21
+
+- **Type:** feature, security
+- **Requirement:** A super admin creates API keys for a user from the admin console. The user cannot see or delete those keys. A key works only while the user is active and their access profile has API on, and only the admin can switch it off or delete it. Users still create their own keys when their profile allows API.
+- **Change:**
+  - New table `admin_api_key` marks `api_token` rows the admin manages: id, tenant, user, token, name, enabled, created by. The key itself is a normal `api_token` row in the user's own tenant, so every API route accepts it. It has no embed (beta) token, so it cannot embed chat pages.
+  - `accessprofile.CheckAPIKeyAccess` now takes the user and the key. It rejects a key when the user is inactive (new: before, an inactive user's existing keys kept working), when the profile turns API off, or when an admin key is switched off ("This API key is disabled. Contact your administrator."). It runs in all three API-key paths in `handler/auth.go`, with no cache, so a switch takes effect on the next request.
+  - The user's key list (`GET /api/v1/system/tokens`) leaves out admin keys, and `DELETE /api/v1/system/tokens/:key` answers 403 for them.
+  - Admin routes: `GET`/`POST /api/v1/admin/users/:email/api-keys`, `PUT`/`DELETE /api/v1/admin/users/:email/api-keys/:key_id`. The full key is returned only by `POST`; lists show a masked key. Each change goes to the admin operation log and the "access profile changed" audit log.
+  - Admin console → Users: a key icon (not shown for superusers or yourself) opens a dialog to create, switch on/off and delete a user's keys. A new key is shown once with a copy button.
+  - Deleting a user also deletes their `admin_api_key` rows.
+- **Files (new):**
+  - `internal/entity/admin_api_key.go`, `internal/dao/admin_api_key.go`
+  - `internal/accessprofile/admin_api_keys.go`, `internal/accessprofile/admin_api_keys_test.go`
+  - `web/src/pages/admin/access-profiles/user-api-keys-dialog.tsx`, `web/src/pages/admin/access-profiles/__tests__/user-api-keys-dialog.test.tsx`
+- **Files (custom, edited):** `internal/accessprofile/api_key.go`, `internal/accessprofile/handler.go`, `internal/accessprofile/accessprofile_test.go`
+- **Files (upstream, edited):**
+  - `internal/dao/database.go` — `&entity.AdminAPIKey{}` in the AutoMigrate list
+  - `internal/handler/auth.go` — `CheckAPIKeyAccess(ctx, identity.User, apiKeyToken(identity))` in the three API-key paths
+  - `internal/service/api_token.go` — list filter and `ErrAPIKeyManagedByAdmin`; `internal/service/api_token_test.go` — tests
+  - `internal/handler/api_token.go` — 403 for admin keys on delete
+  - `internal/service/user_delete.go` — `admin API keys` in the per-tenant cleanup list; `internal/service/user_delete_test.go` — the table is migrated and checked
+  - `web/src/pages/admin/users.tsx` — key action and dialog
+  - `web/src/services/admin-service.ts`, `web/src/utils/api.ts`, `web/src/interfaces/database/access-profile.ts`, `web/src/locales/en.ts`, `web/src/locales/zh.ts`
+- **Database / config impact:** new table `admin_api_key`, created by AutoMigrate on startup (unique index `idx_admin_api_key_token`). No change to existing tables; existing keys are unaffected except that keys of inactive users now stop working.
+- **Tests:**
+  - Go: `bash build.sh --test ./internal/accessprofile/... ./internal/service/... ./internal/handler/...`
+  - Run here in a CGO-free container (`go test` on accessprofile, service, handler, admin, dao): all pass except `TestDocAnalyzerTestsScopedToDefaultBuild`, which only fails because this Windows checkout has CRLF line endings in two files this change does not touch.
+  - Web: `cd web && npx jest src/pages/admin`
+- **Upstream merge notes:**
+  - If upstream adds another place that authenticates with `ResolveAPIToken`, call `accessprofile.CheckAPIKeyAccess` there too.
+  - If upstream adds another listing of `api_token` rows shown to users, filter it with `AdminAPIKeyDAO.TokensForTenant`.
+  - If upstream changes `api_token` (e.g. adds a status column), check `AdminAPIKeyDAO.Create` and `Delete`.
+- **Commits:** `git log --grep "CUST-006"`
+
 ### [CUST-005] Disable self sign-up; the super admin creates users — 2026-11-21
 
 - **Type:** config

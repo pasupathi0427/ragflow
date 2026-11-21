@@ -53,7 +53,7 @@ func (h *AuthHandler) ResolveMCPUser(ctx context.Context, authorization string) 
 			}
 			return nil, err
 		}
-		if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
+		if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User, apiKeyToken(identity)); err != nil {
 			return nil, err
 		}
 		return identity.User, nil
@@ -68,6 +68,14 @@ func (h *AuthHandler) ResolveMCPUser(ctx context.Context, authorization string) 
 		return identity.User, nil
 	}
 	return nil, fmt.Errorf("invalid authorization")
+}
+
+// apiKeyToken returns the API key an identity was resolved from.
+func apiKeyToken(identity *service.AuthIdentity) string {
+	if identity.APIToken == nil {
+		return ""
+	}
+	return identity.APIToken.Token
 }
 
 // userTokenResolver is the subset of UserService the auth
@@ -131,7 +139,7 @@ func (h *AuthHandler) BetaAuthMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
+			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User, apiKeyToken(identity)); err != nil {
 				common.RespondError(c, common.CodeForbidden, err.Error())
 				c.Abort()
 				return
@@ -199,7 +207,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 				c.Abort()
 				return
 			}
-			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User.ID); err != nil {
+			if err := accessprofile.CheckAPIKeyAccess(ctx, identity.User, apiKeyToken(identity)); err != nil {
 				common.Respond(c, http.StatusForbidden, common.CodeForbidden, nil, err.Error())
 				c.Abort()
 				return

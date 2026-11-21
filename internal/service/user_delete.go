@@ -706,6 +706,7 @@ func (data *userDeletionData) deleteDatabaseRows(ctx context.Context, tx *gorm.D
 			{"knowledge compile records", &entity.KnowledgeCompileDataset{}},
 			{"wiki document records", &entity.WikiDocumentDirty{}},
 			{"API tokens", &entity.APIToken{}},
+			{"admin API keys", &entity.AdminAPIKey{}},
 		} {
 			if _, err := remove(item.label, item.model, "tenant_id = ?", owner); err != nil {
 				return err

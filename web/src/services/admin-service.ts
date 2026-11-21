@@ -18,6 +18,7 @@ import { history } from '@/utils/simple-history-util';
 import type {
   IAccessProfile,
   IAccessProfileAssignment,
+  IAdminAPIKey,
 } from '@/interfaces/database/access-profile';
 import type {
   GlobalModelDefaults,
@@ -386,6 +387,32 @@ export const assignAccessProfile = (email: string, profileId: string) =>
   request.put<ResponseData<IAccessProfileAssignment>>(
     api.adminAssignAccessProfile(encodeURIComponent(email)),
     { profile_id: profileId },
+  );
+
+export const listUserAPIKeys = (email: string) =>
+  request.get<ResponseData<IAdminAPIKey[]>>(
+    api.adminUserAPIKeys(encodeURIComponent(email)),
+  );
+
+export const createUserAPIKey = (email: string, name: string) =>
+  request.post<ResponseData<IAdminAPIKey>>(
+    api.adminUserAPIKeys(encodeURIComponent(email)),
+    { name },
+  );
+
+export const setUserAPIKeyEnabled = (
+  email: string,
+  keyId: string,
+  enabled: boolean,
+) =>
+  request.put<ResponseData<IAdminAPIKey>>(
+    api.adminUserAPIKey(encodeURIComponent(email), encodeURIComponent(keyId)),
+    { enabled },
+  );
+
+export const deleteUserAPIKey = (email: string, keyId: string) =>
+  request.delete<ResponseData<void>>(
+    api.adminUserAPIKey(encodeURIComponent(email), encodeURIComponent(keyId)),
   );
 
 const encode = encodeURIComponent;

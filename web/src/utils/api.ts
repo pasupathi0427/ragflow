@@ -541,6 +541,10 @@ const apiEndpoints = {
   adminAccessProfileAssignments: `${restAPIv1}/admin/access-profile-assignments`,
   adminAssignAccessProfile: (username: string) =>
     `${restAPIv1}/admin/users/${username}/access-profile`,
+  adminUserAPIKeys: (username: string) =>
+    `${restAPIv1}/admin/users/${username}/api-keys`,
+  adminUserAPIKey: (username: string, keyId: string) =>
+    `${restAPIv1}/admin/users/${username}/api-keys/${keyId}`,
   myAccessFeatures: `${restAPIv1}/users/me/features`,
 
   // Global model providers

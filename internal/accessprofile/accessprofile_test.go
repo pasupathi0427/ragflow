@@ -43,7 +43,7 @@ func init() {
 // so cached lookups never leak between tests.
 func setupAccessProfileTest(t *testing.T) *Service {
 	t.Helper()
-	db := testutil.SetupTestDB(t, &entity.User{}, &entity.AccessProfile{}, &entity.UserAccessProfile{})
+	db := testutil.SetupTestDB(t, &entity.User{}, &entity.AccessProfile{}, &entity.UserAccessProfile{}, &entity.APIToken{}, &entity.AdminAPIKey{})
 	t.Cleanup(testutil.ReplaceDBForTest(t, db))
 	previous := defaultService
 	defaultService = NewService()
@@ -355,14 +355,15 @@ func TestMyFeatures(t *testing.T) {
 func TestCheckAPIKeyAccess(t *testing.T) {
 	svc := setupAccessProfileTest(t)
 	ctx := context.Background()
-	if err := CheckAPIKeyAccess(ctx, "user-a"); err != nil {
+	userA := &entity.User{ID: "user-a", IsActive: "1"}
+	if err := CheckAPIKeyAccess(ctx, userA, "ragflow-own-key"); err != nil {
 		t.Fatalf("API key rejected for unrestricted user: %v", err)
 	}
 	restricted := mustCreate(t, svc, ProfileInput{Name: "No API", Features: map[string]bool{"api": false}})
 	if _, err := svc.AssignUser(ctx, "a@example.com", restricted.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := CheckAPIKeyAccess(ctx, "user-a"); !errors.Is(err, ErrAPIAccessDisabled) {
+	if err := CheckAPIKeyAccess(ctx, userA, "ragflow-own-key"); !errors.Is(err, ErrAPIAccessDisabled) {
 		t.Fatalf("API key accepted for restricted user: %v", err)
 	}
 }

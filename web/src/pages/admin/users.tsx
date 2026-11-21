@@ -22,6 +22,7 @@ import {
 import {
   LucideClipboardList,
   LucideDot,
+  LucideKeyRound,
   LucideTrash2,
   LucideUserLock,
   LucideUserPlus,
@@ -71,6 +72,7 @@ import { LucideFilter, LucideSearch } from 'lucide-react';
 
 import useChangePasswordForm from './forms/change-password-form';
 import { UserAccessProfileSelect } from './access-profiles/user-access-profile-select';
+import { UserAPIKeysDialog } from './access-profiles/user-api-keys-dialog';
 import useCreateUserForm from './forms/user-form';
 
 import {
@@ -122,6 +124,7 @@ function AdminUserManagement() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
+  const [apiKeysUserEmail, setAPIKeysUserEmail] = useState<string | null>(null);
   const [userToMakeAction, setUserToMakeAction] =
     useState<AdminService.ListUsersItem | null>(null);
 
@@ -333,7 +336,7 @@ function AdminUserManagement() {
           const isMe = row.original.email === userInfo?.email;
 
           return (
-            <div className="opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity">
+            <div className="flex flex-nowrap items-center opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity">
               <Button
                 variant="transparent"
                 size="icon"
@@ -346,6 +349,20 @@ function AdminUserManagement() {
               >
                 <LucideClipboardList />
               </Button>
+
+              {!isMe && !row.original.is_superuser && (
+                <Button
+                  variant="transparent"
+                  size="icon"
+                  className="border-0"
+                  aria-label={t('accessProfile.apiKeys.open', {
+                    email: row.original.email,
+                  })}
+                  onClick={() => setAPIKeysUserEmail(row.original.email)}
+                >
+                  <LucideKeyRound />
+                </Button>
+              )}
 
               {!isMe && (
                 <>
@@ -723,6 +740,18 @@ function AdminUserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {apiKeysUserEmail && (
+        <UserAPIKeysDialog
+          email={apiKeysUserEmail}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setAPIKeysUserEmail(null);
+            }
+          }}
+        />
+      )}
     </>
   );
 }

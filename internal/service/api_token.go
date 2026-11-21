@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"ragflow/internal/common"
 	"ragflow/internal/dao"
@@ -48,9 +49,20 @@ func (s *SystemService) ListAPIKeys(ctx context.Context) ([]*APIKeyResponse, err
 		return nil, err
 	}
 	APITokenDAO := dao.NewAPITokenDAO()
-	keys, err := APITokenDAO.GetByTenantID(ctx, dao.DB, tenantID)
+	allKeys, err := APITokenDAO.GetByTenantID(ctx, dao.DB, tenantID)
 	if err != nil {
 		return nil, err
+	}
+	// Keys a super admin manages for the user are not shown to the user.
+	adminTokens, err := dao.NewAdminAPIKeyDAO().TokensForTenant(ctx, dao.DB, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]*entity.APIToken, 0, len(allKeys))
+	for _, key := range allKeys {
+		if _, managed := adminTokens[key.Token]; !managed {
+			keys = append(keys, key)
+		}
 	}
 
 	responses := make([]*APIKeyResponse, len(keys))
@@ -141,10 +153,21 @@ func apiTokenUserID(value *string) string {
 	return *value
 }
 
+// ErrAPIKeyManagedByAdmin is returned when a user tries to delete a key that a
+// super admin manages for them.
+var ErrAPIKeyManagedByAdmin = errors.New("this API key is managed by your administrator")
+
 func (s *SystemService) DeleteAPIKey(ctx context.Context, key string) error {
 	tenantID, err := requireCurrentTenantID(ctx)
 	if err != nil {
 		return err
+	}
+	adminKey, err := dao.NewAdminAPIKeyDAO().GetByToken(ctx, dao.DB, key)
+	if err != nil {
+		return err
+	}
+	if adminKey != nil {
+		return ErrAPIKeyManagedByAdmin
 	}
 	APITokenDAO := dao.NewAPITokenDAO()
 	_, err = APITokenDAO.DeleteByTenantIDAndToken(ctx, dao.DB, tenantID, key)

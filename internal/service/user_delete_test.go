@@ -130,7 +130,7 @@ func setupUserDeletionDB(t *testing.T) *gorm.DB {
 		&entity.KnowledgeCompileDataset{}, &entity.WikiDocumentDirty{}, &entity.PipelineOperationLog{},
 		&entity.IngestionTask{}, &entity.IngestionTaskLog{}, &entity.FileCommit{}, &entity.FileCommitItem{},
 		&entity.TenantModelProvider{}, &entity.TenantModelInstance{}, &entity.TenantModel{},
-		&entity.TenantLangfuse{}, &entity.APIToken{}, &entity.InvitationCode{},
+		&entity.TenantLangfuse{}, &entity.APIToken{}, &entity.AdminAPIKey{}, &entity.InvitationCode{},
 	)
 	t.Cleanup(testutil.ReplaceDBForTest(t, db))
 	return db
@@ -180,6 +180,7 @@ func TestDeleteUserRemovesOwnedDataAndJoinedDocuments(t *testing.T) {
 	insert("INSERT INTO user_canvas_version (id, user_canvas_id) VALUES (?, ?)", "agent-version", "agent")
 	insert("INSERT INTO api_4_conversation (id, dialog_id, user_id) VALUES (?, ?, ?)", "agent-conversation", "agent", "external-user")
 	insert("INSERT INTO chat_channel (id, tenant_id, name, channel, config) VALUES (?, ?, ?, ?, ?)", "channel", "user-1", "Channel", "telegram", "{}")
+	insert("INSERT INTO admin_api_key (id, tenant_id, user_id, token, name, enabled) VALUES (?, ?, ?, ?, ?, ?)", "admin-key", "user-1", "user-1", "ragflow-admin-key", "Open WebUI", "1")
 	insert("INSERT INTO memory (id, tenant_id, name, embd_id, llm_id, permissions, forgetting_policy) VALUES (?, ?, ?, ?, ?, ?, ?)", "memory", "user-1", "Memory", "embd", "llm", "me", "FIFO")
 	insert("INSERT INTO tenant_model_provider (id, provider_name, tenant_id) VALUES (?, ?, ?)", "provider", "custom", "user-1")
 	insert("INSERT INTO tenant_model_instance (id, instance_name, provider_id, api_key) VALUES (?, ?, ?, ?)", "instance", "custom", "provider", "secret")
@@ -225,7 +226,7 @@ func TestDeleteUserRemovesOwnedDataAndJoinedDocuments(t *testing.T) {
 		{"user_canvas", "agent"}, {"user_canvas_version", "agent-version"}, {"chat_channel", "channel"},
 		{"memory", "memory"}, {"tenant_model_provider", "provider"}, {"tenant_model_instance", "instance"},
 		{"tenant_model", "model"}, {"file_commit", "own-commit"},
-		{"file_commit_item", "own-commit-item"},
+		{"file_commit_item", "own-commit-item"}, {"admin_api_key", "admin-key"},
 	} {
 		var count int64
 		if err := db.Table(item[0]).Where("id = ?", item[1]).Count(&count).Error; err != nil {
