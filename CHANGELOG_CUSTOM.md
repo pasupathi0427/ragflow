@@ -34,6 +34,18 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-005] Disable self sign-up; the super admin creates users — 2026-11-21
+
+- **Type:** config
+- **Requirement:** Only people the administrator allows may use RAGFlow. Nobody may create their own account.
+- **Change:** Self registration is switched off. The login page hides **Sign up**, and `POST /api/v1/users` answers "user registration is disabled". The super admin creates accounts in **Admin console → Users** and turns access off with the existing Active / Inactive switch.
+- **Files (upstream, edited):** `docker/.env`: `ENABLE_REGISTER=0` (read by the Go server) and `REGISTER_ENABLED=0` (the Python API's name for the same switch).
+- **Database / config impact:** env only; recreate the RAGFlow container to apply it. No migration.
+- **Tests:** none (configuration only). After recreating the container, check that the login page shows no Sign up link and that registering through the API is rejected.
+- **Upstream merge notes:** keep both values at `0` when upstream changes `docker/.env`. If upstream renames the switch, set the new name to `0` as well.
+- **Known gap:** an Inactive user's existing API keys still work; to be closed with the admin API key management change.
+- **Commits:** `git log --grep "CUST-005"`
+
 ### [CUST-004] Fix duplicated fields in data source forms (Confluence Space Key) — 2026-11-19
 
 - **Type:** fix
