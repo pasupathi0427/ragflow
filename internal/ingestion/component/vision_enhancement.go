@@ -55,10 +55,10 @@ var (
 
 const (
 	visionEnhancementConcurrency int = 10
-	// visionChatTimeout bounds a single VLM call so a hung endpoint cannot
-	// occupy one of the concurrency slots indefinitely. It wraps each
-	// per-image call with a 30-second timeout and 3 retries.
-	visionChatTimeout     = 30 * time.Second
+	// visionChatTimeoutDefault bounds a single VLM call so a hung endpoint
+	// cannot occupy one of the concurrency slots indefinitely.
+	// VISION_ENHANCEMENT_TIMEOUT_SECONDS overrides it (resolveVisionChatTimeout).
+	visionChatTimeoutDefault = 30 * time.Second
 	visionMediaItemBudget = 10 * time.Second
 )
 
@@ -548,7 +548,7 @@ func defaultVisionChatInvoker(
 	messages []modelModule.Message,
 	apiConfig *modelModule.APIConfig,
 ) (*modelModule.ChatResponse, error) {
-	chatCtx, cancel := context.WithTimeout(ctx, visionChatTimeout)
+	chatCtx, cancel := context.WithTimeout(ctx, resolveVisionChatTimeout())
 	defer cancel()
 	config := &modelModule.ChatConfig{Vision: new(true), Thinking: new(false)}
 	chatModel := modelModule.NewChatModel(driver, &modelName, apiConfig)

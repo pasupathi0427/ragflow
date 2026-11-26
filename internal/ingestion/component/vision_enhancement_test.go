@@ -1317,8 +1317,8 @@ func TestDefaultVisionChatInvoker_AppliesDeadline(t *testing.T) {
 	if !drv.hasDeadline {
 		t.Fatal("vision chat context must have a deadline")
 	}
-	if drv.remaining <= 0 || drv.remaining > visionChatTimeout+time.Second {
-		t.Fatalf("deadline remaining = %v, want ~%v", drv.remaining, visionChatTimeout)
+	if drv.remaining <= 0 || drv.remaining > visionChatTimeoutDefault+time.Second {
+		t.Fatalf("deadline remaining = %v, want ~%v", drv.remaining, visionChatTimeoutDefault)
 	}
 	if drv.config == nil || drv.config.Vision == nil || !*drv.config.Vision {
 		t.Fatal("vision chat must enable vision")
