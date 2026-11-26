@@ -98,6 +98,7 @@ func parsePDFWithDocling(ctx context.Context, filename string, data []byte, pars
 	}
 
 	sourcePages := doclingSourcePageCount(data)
+	client := doclingHTTPClient(baseURL)
 
 	var lastErr error
 	for _, candidate := range payloads {
@@ -108,7 +109,7 @@ func parsePDFWithDocling(ctx context.Context, filename string, data []byte, pars
 			break
 		}
 		url := baseURL + candidate.endpoint
-		resp, err := models.PostJSONRequest(ctx, common.GetSSRFHTTPClient(), url, auth, candidate.body())
+		resp, err := models.PostJSONRequest(ctx, client, url, auth, candidate.body())
 		if err != nil {
 			lastErr = fmt.Errorf("%s: %w", candidate.endpoint, err)
 			continue
