@@ -34,6 +34,19 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-010] Keep the conversation on the OpenAI-compatible chat endpoint — 2026-11-26
+
+- **Type:** feature, config
+- **Requirement:** One UI calls RAGFlow chat assistants through `/api/v1/openai/<chat_id>/chat/completions` and sends the whole conversation, but RAGFlow kept only the last message. A follow-up such as "for other locations ??" was answered on its own and found the wrong policy.
+- **Change:** new env `OPENAI_CHAT_KEEP_HISTORY`. On, the endpoint passes the whole conversation to the chat pipeline; off (default), it keeps only the last message as upstream does. The existing filter still drops system messages and leading assistant messages, the last message must still be from the user, and the pipeline still trims the conversation to 95% of the model's context window (`messageFitIn`).
+- **Files (new):** `internal/service/openai_chat_history.go` (`openAIChatConversation`), `internal/service/openai_chat_history_test.go`
+- **Files (upstream, edited):** `internal/service/openai_chat.go` — the "keep the last message" block replaced by `req.Messages = openAIChatConversation(req.Messages)`
+- **Database / config impact:** optional env `OPENAI_CHAT_KEEP_HISTORY=true` in `docker/.env`. For follow-ups to also search the right documents, turn on **Multi-turn optimization** in the chat assistant's settings: retrieval otherwise uses only the last question.
+- **Cost:** with history on, every follow-up sends the earlier turns to the model, so input tokens grow with the conversation (up to the 95% trim); Multi-turn optimization adds one small model call per follow-up.
+- **Tests:** `bash build.sh --test ./internal/service/...` — off keeps the last message, on keeps all, invalid value keeps the default, empty input, and the system prompt is still filtered out. Run here with `CGO_ENABLED=0 go test -run OpenAI` in the local toolchain container: package passes, `go vet` clean.
+- **Upstream merge notes:** if upstream changes how `OpenAIChatCompletions` selects messages or starts loading session history itself, re-check the one-line hunk and drop this change if upstream covers it.
+- **Commits:** `git log --grep "CUST-010"`
+
 ### [CUST-006] Admin-managed API keys for users — 2026-11-21
 
 - **Type:** feature, security
