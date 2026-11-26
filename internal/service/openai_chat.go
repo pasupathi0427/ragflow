@@ -153,9 +153,7 @@ func (s *OpenAIChatService) OpenAIChatCompletions(c *gin.Context, chatID string,
 	if req.Question != "" || req.Query != "" {
 		req.Messages = []map[string]interface{}{{"role": "user", "content": question}}
 	}
-	if len(req.Messages) > 0 {
-		req.Messages = req.Messages[len(req.Messages)-1:]
-	}
+	req.Messages = openAIChatConversation(req.Messages)
 	common.Info("OpenAIChatCompletions started", zap.String("chat_id", chatID))
 
 	normalizedMessages, err := normalizeOpenAIMessages(req.Messages)
