@@ -34,6 +34,42 @@ Before merging or rebasing onto upstream, read this file to see which files carr
 
 ## Changes
 
+### [CUST-009] Global models: Vision and Speech-to-text models can be added — 2026-11-26
+
+- **Type:** fix
+- **Requirement:** Adding a global model with only the Vision (or Speech-to-text) type failed with "model verification did not run: image2text has no verification in this build".
+- **Change:** the add-model and create-instance dialogs sent the stored type names (`image2text`, `speech2text`). Model verification only knows the request names (`vision`, `asr`), so nothing was tested and the add was refused. `toModelInputs` now sends the request names through the existing `GlobalModelTypes` mapping (`toRequestModelType`). Saving accepts both names (`entity.ModelTypeFromString`), so stored models are unchanged.
+- **Files (custom, edited):** `web/src/pages/admin/global-models/constants.ts`, `web/src/pages/admin/global-models/instance-dialog.tsx`
+- **Files (new):** `web/src/pages/admin/global-models/__tests__/instance-dialog.test.ts`
+- **Database / config impact:** none
+- **Tests:** `cd web && npx jest src/pages/admin/global-models` (4 pass). The new test fails without the fix (it gets `image2text`).
+- **Upstream merge notes:** none; only CUST-003 files change.
+- **Commits:** `git log --grep "CUST-009"`
+
+### [CUST-008] Docling on a private address set by the server admin — 2026-11-26
+
+- **Type:** fix, security
+- **Requirement:** Docling Serve runs on another machine in the same private network (for example AWS VM2, `10.0.147.88`). RAGFlow refused it: "URL resolves to a non-public address … which is not allowed". The only built-in way round it, `ALLOW_ANY_HOST=true`, opens private addresses to every outbound feature (agent tools, MCP, connectors, database dials), which we do not allow on servers.
+- **Change:** a Docling request whose scheme, host and port match `DOCLING_SERVER_URL` (set in the server env by whoever runs it) uses the scheme-safe HTTP client, the one upstream uses for self-hosted vLLM and Ollama. Every other Docling URL, including a `docling_server_url` from a dataset's parser settings, keeps the strict SSRF client, so a dataset cannot reach another internal address. `ALLOW_ANY_HOST` stays off.
+- **Files (new):** `internal/parser/parser/pdf_parser_docling_client.go` (`doclingHTTPClient`, `sameDoclingOrigin`), `internal/parser/parser/pdf_parser_docling_client_test.go`
+- **Files (upstream, edited):** `internal/parser/parser/pdf_parser_docling.go` — picks the client once with `doclingHTTPClient(baseURL)` and passes it to `models.PostJSONRequest` (2 lines)
+- **Database / config impact:** none. Set `DOCLING_SERVER_URL=http://<docling-private-ip>:5001` in `docker/.env` (base URL only, no path). Remove any temporary `ALLOW_ANY_HOST=true` added for Docling.
+- **Tests:** `bash build.sh --test ./internal/parser/parser/...` — env-configured loopback host is reached; the same host from parser settings, with another or no env host, is still rejected with "non-public address" and never contacted; origin matching (scheme, host, port). Run here with `CGO_ENABLED=0 go test` in the local toolchain container: package passes, `go vet` clean.
+- **Upstream merge notes:** if upstream changes how `parsePDFWithDocling` builds its client or adds its own private-host allowlist, re-check the 2-line hunk and drop this change if upstream covers it.
+- **Commits:** `git log --grep "CUST-008"`
+
+### [CUST-007] Configurable timeout for vision enhancement calls — 2026-11-26
+
+- **Type:** config
+- **Requirement:** a self-hosted vision model (Qwen 27B on vLLM, about 25 tokens/s) needed more than the fixed 30 seconds to describe a dense figure, so the image lost its description ("vision enhancement failed … context deadline exceeded").
+- **Change:** new env `VISION_ENHANCEMENT_TIMEOUT_SECONDS` sets the per-call limit of a vision-enhancement request. Unset, zero, negative or not a number keeps the 30-second default.
+- **Files (new):** `internal/ingestion/component/vision_timeout.go` (`resolveVisionChatTimeout`), `internal/ingestion/component/vision_timeout_test.go`
+- **Files (upstream, edited):** `internal/ingestion/component/vision_enhancement.go` — const `visionChatTimeout` renamed `visionChatTimeoutDefault`; `defaultVisionChatInvoker` calls `resolveVisionChatTimeout()`. `internal/ingestion/component/vision_enhancement_test.go` — uses the renamed const.
+- **Database / config impact:** optional env `VISION_ENHANCEMENT_TIMEOUT_SECONDS` in `docker/.env` (e.g. `120`).
+- **Tests:** `bash build.sh --test ./internal/ingestion/component/...` — default, set, invalid values; the invoker's deadline follows the env. Run here with `CGO_ENABLED=0 go test` in the local toolchain container: package passes, `go vet` clean.
+- **Upstream merge notes:** if upstream changes `visionChatTimeout` or makes the timeout configurable itself, re-apply the rename or drop this change.
+- **Commits:** `git log --grep "CUST-007"`
+
 ### [CUST-006] Admin-managed API keys for users — 2026-11-21
 
 - **Type:** feature, security

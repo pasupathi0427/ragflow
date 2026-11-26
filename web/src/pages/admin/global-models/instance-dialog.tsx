@@ -20,7 +20,11 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DefaultMaxTokens, GlobalModelTypeKey } from './constants';
+import {
+  DefaultMaxTokens,
+  GlobalModelTypeKey,
+  toRequestModelType,
+} from './constants';
 import { useCreateGlobalInstance, useTestGlobalConnection } from './hooks';
 import { ModelTypeCheckboxes } from './model-type-checkboxes';
 
@@ -36,7 +40,7 @@ export const toModelInputs = (models: ModelDraft[]): IGlobalModelInput[] =>
     .filter((model) => model.name.trim() && model.types.length > 0)
     .map((model) => ({
       model_name: model.name.trim(),
-      model_type: model.types,
+      model_type: model.types.map(toRequestModelType),
       max_tokens: model.maxTokens,
     }));
 

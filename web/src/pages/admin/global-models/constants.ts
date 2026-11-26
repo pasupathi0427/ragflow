@@ -17,4 +17,20 @@ export const GlobalModelTypes = [
 
 export type GlobalModelTypeKey = (typeof GlobalModelTypes)[number]['storedKey'];
 
+const RequestKeyByStoredKey: Record<GlobalModelTypeKey, string> =
+  Object.fromEntries(
+    GlobalModelTypes.map(({ storedKey, requestKey }) => [
+      storedKey,
+      requestKey,
+    ]),
+  ) as Record<GlobalModelTypeKey, string>;
+
+/**
+ * The name the server's model verification understands for a type: it checks
+ * "vision" and "asr", not the stored "image2text" and "speech2text". Saving
+ * accepts both names.
+ */
+export const toRequestModelType = (type: GlobalModelTypeKey): string =>
+  RequestKeyByStoredKey[type] ?? type;
+
 export const DefaultMaxTokens = 8192;
